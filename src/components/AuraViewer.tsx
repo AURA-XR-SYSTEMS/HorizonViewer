@@ -131,49 +131,77 @@ export default function AuraViewer({ config }: AuraViewerProps) {
 
   return (
     <div className="bg-aura-black text-text-primary relative h-full w-full overflow-hidden">
-      <div
+      {/* <div
         ref={containerRef}
         className="absolute inset-0 bg-cover bg-center"
         style={{
           backgroundImage: currentView ? `url(${currentView.imageUrl})` : undefined,
         }}
-      ></div>
-      {locations.map((location) => {
-        const viewPosition = location.viewPositions.find(
-          (position) => position.viewId === currentViewId
-        )
-
-        if (!viewPosition) return null
-
-        const pinPos = calculatePinPosition(
-          viewPosition.x,
-          viewPosition.y,
-          containerSize,
-          imageNaturalSize
-        )
-
-        if (!pinPos.visible) return null
-
-        return (
-          <AuraPin
-            key={location.id}
-            location={location}
-            left={pinPos.left}
-            top={pinPos.top}
-            isVisible={true}
-            isSelected={openPanels.some((panel) => panel.location.id === location.id)}
-            onClick={(loc) => {
-              if (openPanels.some((panel) => panel.location.id === loc.id)) {
-                setOpenPanels((prev) =>
-                  prev.filter((panel) => panel.location.id !== loc.id)
-                )
-              } else {
-                setOpenPanels((prev) => [...prev, { location: loc }])
-              }
+      ></div> */}
+      {config.transitions.map((t) => (
+        <div
+          key={t.key}
+          className={`absolute inset-0 ${activeTransitionKey === t.key ? 'z-10' : 'z-0'}`}
+        >
+          <video
+            ref={(el) => {
+              videoRefs.current[t.key] = el
             }}
+            src={t.videoUrl}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            preload="auto"
           />
-        )
-      })}
+        </div>
+      ))}
+
+      <div
+        ref={containerRef}
+        className={`absolute inset-0 z-20 ${
+          showStaticImage ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          backgroundImage: currentView ? `url(${currentView.imageUrl})` : undefined,
+        }}
+      >
+        {locations.map((location) => {
+          const viewPosition = location.viewPositions.find(
+            (position) => position.viewId === currentViewId
+          )
+
+          if (!viewPosition) return null
+
+          const pinPos = calculatePinPosition(
+            viewPosition.x,
+            viewPosition.y,
+            containerSize,
+            imageNaturalSize
+          )
+
+          if (!pinPos.visible) return null
+
+          return (
+            <AuraPin
+              key={location.id}
+              location={location}
+              left={pinPos.left}
+              top={pinPos.top}
+              isVisible={true}
+              isSelected={openPanels.some((panel) => panel.location.id === location.id)}
+              onClick={(loc) => {
+                if (openPanels.some((panel) => panel.location.id === loc.id)) {
+                  setOpenPanels((prev) =>
+                    prev.filter((panel) => panel.location.id !== loc.id)
+                  )
+                } else {
+                  setOpenPanels((prev) => [...prev, { location: loc }])
+                }
+              }}
+            />
+          )
+        })}
+      </div>
 
       {openPanels.map((panel) => {
         const viewPosition = panel.location.viewPositions.find(
