@@ -10,6 +10,7 @@ import {
   getTimelineLayout,
   getCarouselIndexForView,
 } from '@/lib/timeline'
+import { useViewerLayout } from '@/hooks/useViewerLayout'
 
 interface AuraViewerProps {
   config: ProjectConfig
@@ -19,27 +20,60 @@ interface OpenPanel {
   location: AuraLocation
 }
 
+interface VisibleLocationEnumerable {
+  id: string
+  location: AuraLocation
+  left: string
+  top: string
+}
+
 export default function AuraViewer({ config }: AuraViewerProps) {
   const { views, locations } = config
 
   const [currentViewId, setCurrentViewId] = useState(views[0]?.id ?? 1)
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 1920, height: 1080 })
   const [openPanels, setOpenPanels] = useState<OpenPanel[]>([])
   const [timelineExpanded, setTimelineExpanded] = useState(false)
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [carouselIndex, setCarouselIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [activeTransitionKey, setActiveTransitionKey] = useState<string | null>(null)
   const [showStaticImage, setShowStaticImage] = useState(true)
 
-  const containerRef = useRef<HTMLDivElement>(null)
+  const { containerRef, containerSize, windowWidth } = useViewerLayout()
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
 
   const currentView = useMemo(
     () => views.find((view) => view.id === currentViewId),
     [views, currentViewId]
   )
+
+  const visibleLocations = useMemo<VisibleLocationEnumerable[]>(() => {
+    return locations
+      .map((location): VisibleLocationEnumerable | null => {
+        const viewPosition = location.viewPositions.find(
+          (position) => position.viewId === currentViewId
+        )
+
+        if (!viewPosition) return null
+
+        const pinPos = calculatePinPosition(
+          viewPosition.x,
+          viewPosition.y,
+          containerSize,
+          imageNaturalSize
+        )
+
+        if (!pinPos.visible) return null
+
+        return {
+          id: location.id,
+          location: location,
+          left: pinPos.left,
+          top: pinPos.top,
+        }
+      })
+      .filter((item): item is VisibleLocationEnumerable => item !== null)
+  }, [locations, currentViewId, containerSize, imageNaturalSize])
 
   useEffect(() => {
     setCarouselIndex((prev) => clampCarouselIndex(prev, windowWidth, views.length))
@@ -53,40 +87,6 @@ export default function AuraViewer({ config }: AuraViewerProps) {
       getCarouselIndexForView(selectedIndex, prev, windowWidth, views.length)
     )
   }, [currentViewId, windowWidth, views])
-
-  useEffect(() => {
-    const updateContainerSize = () => {
-      if (!containerRef.current) return
-
-      setContainerSize({
-        width: containerRef.current.offsetWidth,
-        height: containerRef.current.offsetHeight,
-      })
-    }
-
-    updateContainerSize()
-    window.addEventListener('resize', updateContainerSize)
-
-    return () => {
-      window.removeEventListener('resize', updateContainerSize)
-    }
-  }, [])
-
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth)
-
-      if (containerRef.current) {
-        setContainerSize({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        })
-      }
-    }
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
 
   useEffect(() => {
     if (!currentView?.imageUrl) return
@@ -173,6 +173,17 @@ export default function AuraViewer({ config }: AuraViewerProps) {
     video.currentTime = 0
   }
 
+  const isPanelOpen = (locationId: string) =>
+    openPanels.some((panel) => panel.location.id === locationId)
+
+  const togglePanel = (location: AuraLocation) => {
+    setOpenPanels((prev) =>
+      prev.some((panel) => panel.location.id === location.id)
+        ? prev.filter((panel) => panel.location.id !== location.id)
+        : [...prev, { location }]
+    )
+  }
+
   return (
     <div className="bg-aura-black text-text-primary relative h-full w-full overflow-hidden">
       {config.transitions.map((t) => (
@@ -202,42 +213,17 @@ export default function AuraViewer({ config }: AuraViewerProps) {
           backgroundImage: currentView ? `url(${currentView.imageUrl})` : undefined,
         }}
       >
-        {locations.map((location) => {
-          const viewPosition = location.viewPositions.find(
-            (position) => position.viewId === currentViewId
-          )
-
-          if (!viewPosition) return null
-
-          const pinPos = calculatePinPosition(
-            viewPosition.x,
-            viewPosition.y,
-            containerSize,
-            imageNaturalSize
-          )
-
-          if (!pinPos.visible) return null
-
-          return (
-            <AuraPin
-              key={location.id}
-              location={location}
-              left={pinPos.left}
-              top={pinPos.top}
-              isVisible={!isTransitioning}
-              isSelected={openPanels.some((panel) => panel.location.id === location.id)}
-              onClick={(loc) => {
-                if (openPanels.some((panel) => panel.location.id === loc.id)) {
-                  setOpenPanels((prev) =>
-                    prev.filter((panel) => panel.location.id !== loc.id)
-                  )
-                } else {
-                  setOpenPanels((prev) => [...prev, { location: loc }])
-                }
-              }}
-            />
-          )
-        })}
+        {visibleLocations.map(({ id, location, left, top }) => (
+          <AuraPin
+            key={id}
+            location={location}
+            left={left}
+            top={top}
+            isVisible={!isTransitioning}
+            isSelected={isPanelOpen(id)}
+            onClick={togglePanel}
+          />
+        ))}
       </div>
 
       {!isTransitioning && // hide panels during transition
