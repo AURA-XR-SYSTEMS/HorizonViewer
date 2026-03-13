@@ -2,6 +2,7 @@ import { useMemo } from 'preact/hooks'
 import { getTimelineLayout } from '@/lib/timeline'
 import type { AuraView } from '@/types'
 import { ChevronLeft, ChevronRight } from './TimelineChevron'
+import { TimelineArrow } from './TimelineArrow'
 
 interface TimelineCarouselProps {
   views: AuraView[]
@@ -17,8 +18,6 @@ interface TimelineCarouselProps {
 const CARD_WIDTH = 144
 const CARD_HEIGHT = 96
 const CARD_GAP = 12
-const ARROW_EXPANDED_SIZE = 40
-const ARROW_COLLAPSED_SIZE = 6
 
 export default function TimelineCarousel({
   views,
@@ -43,8 +42,6 @@ export default function TimelineCarousel({
     return views
   }, [expanded, views, validCarouselIndex, maxVisibleCards])
 
-  const arrowSize = expanded ? ARROW_EXPANDED_SIZE : ARROW_COLLAPSED_SIZE
-
   return (
     <div className="absolute inset-x-0 bottom-6 flex justify-center">
       <div
@@ -52,27 +49,12 @@ export default function TimelineCarousel({
           expanded ? 'gap-3' : 'gap-2'
         }`}
       >
-        <button
-          type="button"
+        <TimelineArrow
+          direction="left"
+          expanded={expanded}
+          enabled={canScrollLeft}
           onClick={onScrollLeft}
-          className={`text-aura-black flex items-center justify-center transition-all duration-300 ${
-            expanded
-              ? 'rounded-pill shadow-card hover:bg-aura-white h-10 w-10 bg-white/90 hover:scale-105'
-              : 'rounded-pill h-1.5 w-1.5 bg-white/40 hover:bg-white/60'
-          } ${
-            canScrollLeft
-              ? expanded
-                ? 'hover:bg-aura-white bg-white/90 hover:scale-105'
-                : 'bg-white/40 hover:bg-white/60'
-              : 'pointer-events-none bg-transparent opacity-0'
-          }`}
-          style={{
-            width: arrowSize,
-            height: arrowSize,
-          }}
-        >
-          {expanded && <ChevronLeft />}
-        </button>
+        />
 
         <div
           className="overflow-hidden transition-all duration-300"
@@ -176,27 +158,12 @@ export default function TimelineCarousel({
           </div>
         </div>
 
-        <button
-          type="button"
+        <TimelineArrow
+          direction="right"
+          expanded={expanded}
+          enabled={canScrollRight}
           onClick={onScrollRight}
-          disabled={!canScrollRight}
-          aria-hidden={!canScrollRight}
-          className={`text-aura-black flex items-center justify-center transition-all duration-300 ${
-            expanded ? 'rounded-pill shadow-card h-10 w-10' : 'rounded-pill h-1.5 w-1.5'
-          } ${
-            canScrollRight
-              ? expanded
-                ? 'hover:bg-aura-white bg-white/90 hover:scale-105'
-                : 'bg-white/40 hover:bg-white/60'
-              : 'pointer-events-none bg-transparent opacity-0'
-          }`}
-          style={{
-            width: arrowSize,
-            height: arrowSize,
-          }}
-        >
-          {expanded && <ChevronRight />}
-        </button>
+        />
       </div>
     </div>
   )
