@@ -5,7 +5,11 @@ import TimelineCarousel from '@/components/TimelineCarousel'
 import TimelineZone from '@/components/TimelineZone'
 import { calculatePinPosition } from '@/lib/pinPosition'
 import type { AuraLocation, ProjectConfig } from '@/types'
-import { clampCarouselIndex, getTimelineLayout } from '@/lib/timeline'
+import {
+  clampCarouselIndex,
+  getTimelineLayout,
+  getCarouselIndexForView,
+} from '@/lib/timeline'
 
 interface AuraViewerProps {
   config: ProjectConfig
@@ -36,6 +40,15 @@ export default function AuraViewer({ config }: AuraViewerProps) {
   useEffect(() => {
     setCarouselIndex((prev) => clampCarouselIndex(prev, windowWidth, views.length))
   }, [windowWidth, views.length])
+
+  useEffect(() => {
+    const selectedIndex = views.findIndex((view) => view.id === currentViewId)
+    if (selectedIndex === -1) return
+
+    setCarouselIndex((prev) =>
+      getCarouselIndexForView(selectedIndex, prev, windowWidth, views.length)
+    )
+  }, [currentViewId, windowWidth, views])
 
   useEffect(() => {
     const updateContainerSize = () => {
@@ -98,6 +111,10 @@ export default function AuraViewer({ config }: AuraViewerProps) {
     }
   }
 
+  const handleSelectView = (viewId: number) => {
+    setCurrentViewId(viewId)
+  }
+
   return (
     <div className="bg-aura-black text-text-primary relative h-full w-full overflow-hidden">
       <div
@@ -132,11 +149,7 @@ export default function AuraViewer({ config }: AuraViewerProps) {
               isVisible={true}
               isSelected={openPanels.some((panel) => panel.location.id === location.id)}
               onClick={(loc) => {
-                const isAlreadyOpen = openPanels.some(
-                  (panel) => panel.location.id === loc.id
-                )
-
-                if (isAlreadyOpen) {
+                if (openPanels.some((panel) => panel.location.id === loc.id)) {
                   setOpenPanels((prev) =>
                     prev.filter((panel) => panel.location.id !== loc.id)
                   )
@@ -195,7 +208,7 @@ export default function AuraViewer({ config }: AuraViewerProps) {
           expanded={timelineExpanded}
           carouselIndex={carouselIndex}
           windowWidth={windowWidth}
-          onSelectView={(viewId) => setCurrentViewId(viewId)}
+          onSelectView={handleSelectView}
           onScrollLeft={() => scrollCarousel('left')}
           onScrollRight={() => scrollCarousel('right')}
         />

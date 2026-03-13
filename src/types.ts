@@ -18,12 +18,14 @@ export interface AuraViewPosition {
 }
 
 export interface AuraLocationDescription {
-  Type?: string
   Short?: string
+  Detailed?: string
+  Type?: string
 }
 
 export interface AuraLocation {
   id: string
+  place_id?: string
   Name: string
   Address?: string
   Region?: string

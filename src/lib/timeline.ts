@@ -46,3 +46,25 @@ export function clampCarouselIndex(
   const { maxIndex } = getTimelineLayout(windowWidth, totalViews)
   return Math.min(index, maxIndex)
 }
+
+export function getCarouselIndexForView(
+  viewIndex: number,
+  currentCarouselIndex: number,
+  windowWidth: number,
+  totalViews: number
+) {
+  const { maxVisibleCards, maxIndex } = getTimelineLayout(windowWidth, totalViews)
+
+  const windowStart = currentCarouselIndex
+  const windowEnd = currentCarouselIndex + maxVisibleCards - 1
+
+  if (viewIndex < windowStart) {
+    return viewIndex
+  }
+
+  if (viewIndex > windowEnd) {
+    return Math.min(viewIndex - maxVisibleCards + 1, maxIndex)
+  }
+
+  return currentCarouselIndex
+}
