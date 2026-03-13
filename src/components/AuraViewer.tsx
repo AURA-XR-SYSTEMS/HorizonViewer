@@ -29,8 +29,12 @@ export default function AuraViewer({ config }: AuraViewerProps) {
   const [timelineExpanded, setTimelineExpanded] = useState(false)
   const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   const [carouselIndex, setCarouselIndex] = useState(0)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [activeTransitionKey, setActiveTransitionKey] = useState<string | null>(null)
+  const [showStaticImage, setShowStaticImage] = useState(true)
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
 
   const currentView = useMemo(
     () => views.find((view) => view.id === currentViewId),
@@ -111,6 +115,16 @@ export default function AuraViewer({ config }: AuraViewerProps) {
     }
   }
 
+  // preload transition videos
+  useEffect(() => {
+    config.transitions.forEach((t) => {
+      const video = videoRefs.current[t.key]
+      if (video) {
+        video.load()
+      }
+    })
+  }, [config.transitions])
+
   const handleSelectView = (viewId: number) => {
     setCurrentViewId(viewId)
   }
@@ -123,44 +137,43 @@ export default function AuraViewer({ config }: AuraViewerProps) {
         style={{
           backgroundImage: currentView ? `url(${currentView.imageUrl})` : undefined,
         }}
-      >
-        {locations.map((location) => {
-          const viewPosition = location.viewPositions.find(
-            (position) => position.viewId === currentViewId
-          )
+      ></div>
+      {locations.map((location) => {
+        const viewPosition = location.viewPositions.find(
+          (position) => position.viewId === currentViewId
+        )
 
-          if (!viewPosition) return null
+        if (!viewPosition) return null
 
-          const pinPos = calculatePinPosition(
-            viewPosition.x,
-            viewPosition.y,
-            containerSize,
-            imageNaturalSize
-          )
+        const pinPos = calculatePinPosition(
+          viewPosition.x,
+          viewPosition.y,
+          containerSize,
+          imageNaturalSize
+        )
 
-          if (!pinPos.visible) return null
+        if (!pinPos.visible) return null
 
-          return (
-            <AuraPin
-              key={location.id}
-              location={location}
-              left={pinPos.left}
-              top={pinPos.top}
-              isVisible={true}
-              isSelected={openPanels.some((panel) => panel.location.id === location.id)}
-              onClick={(loc) => {
-                if (openPanels.some((panel) => panel.location.id === loc.id)) {
-                  setOpenPanels((prev) =>
-                    prev.filter((panel) => panel.location.id !== loc.id)
-                  )
-                } else {
-                  setOpenPanels((prev) => [...prev, { location: loc }])
-                }
-              }}
-            />
-          )
-        })}
-      </div>
+        return (
+          <AuraPin
+            key={location.id}
+            location={location}
+            left={pinPos.left}
+            top={pinPos.top}
+            isVisible={true}
+            isSelected={openPanels.some((panel) => panel.location.id === location.id)}
+            onClick={(loc) => {
+              if (openPanels.some((panel) => panel.location.id === loc.id)) {
+                setOpenPanels((prev) =>
+                  prev.filter((panel) => panel.location.id !== loc.id)
+                )
+              } else {
+                setOpenPanels((prev) => [...prev, { location: loc }])
+              }
+            }}
+          />
+        )
+      })}
 
       {openPanels.map((panel) => {
         const viewPosition = panel.location.viewPositions.find(
