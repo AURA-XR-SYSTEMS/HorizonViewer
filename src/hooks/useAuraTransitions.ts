@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import type { ProjectConfig } from '@/types'
 
 interface UseAuraTransitionsParams {
@@ -16,6 +16,11 @@ export function useAuraTransitions({
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [activeTransitionKey, setActiveTransitionKey] = useState<string | null>(null)
   const [showStaticImage, setShowStaticImage] = useState(true)
+
+  const transitionMap = useMemo(
+    () => new Map(transitions.map((transition) => [transition.key, transition])),
+    [transitions]
+  )
 
   // consider smarter video loading approach
   useEffect(() => {
@@ -37,7 +42,7 @@ export function useAuraTransitions({
     if (isTransitioning || targetViewId === currentViewId) return
 
     const transitionKey = `${currentViewId}-${targetViewId}`
-    const transition = transitions.find((item) => item.key === transitionKey)
+    const transition = transitionMap.get(transitionKey)
 
     if (!transition) {
       onViewChange(targetViewId)
