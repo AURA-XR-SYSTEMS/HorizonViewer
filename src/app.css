@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/* ─── Aura HORIZON Design System ─── */
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-aura-white: #ffffff;
+  --color-aura-black: #000000;
+  --color-aura-slate: #0f172a;
+
+  --color-accent-blue: #3b82f6;
+  --color-accent-blue-light: #60a5fa;
+  --color-accent-amber: #fbbf24;
+
+  --color-feedback-error: #ef4444;
+  --color-feedback-error-light: #f87171;
+
+  --color-surface-glass: rgba(60, 60, 60, 0.25);
+  --color-surface-glass-border: rgba(200, 200, 200, 0.4);
+  --color-surface-overlay: rgba(0, 0, 0, 0.4);
+
+  --color-text-primary: rgba(255, 255, 255, 1);
+  --color-text-secondary: rgba(255, 255, 255, 0.8);
+  --color-text-tertiary: rgba(255, 255, 255, 0.7);
+  --color-text-muted: rgba(255, 255, 255, 0.5);
+  --color-text-faint: rgba(255, 255, 255, 0.4);
+
+  --color-pin-fill: #ffffff;
+  --color-pin-fill-selected: #60a5fa;
+  --color-pin-stroke: #000000;
+
+  --spacing-card-width: 144px;
+  --spacing-card-height: 96px;
+  --spacing-card-gap: 12px;
+  --spacing-arrow-size: 40px;
+  --spacing-hotzone-height: 160px;
+
+  --radius-panel: 12px;
+  --radius-pill: 9999px;
+  --radius-card: 12px;
+
+  --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-pin: 0 2px 4px rgba(0, 0, 0, 0.3);
+
+  --blur-glass: 12px;
+  --blur-sm: 4px;
+
+  --ease-out-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 400ms;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+
+@keyframes panelEmerge {
+  from {
+    opacity: 0;
+    transform: translate(40px, -28px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(40px, -28px) scale(1);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
