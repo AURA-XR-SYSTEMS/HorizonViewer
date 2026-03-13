@@ -5,6 +5,7 @@ import TimelineCarousel from '@/components/TimelineCarousel'
 import TimelineZone from '@/components/TimelineZone'
 import { calculatePinPosition } from '@/lib/pinPosition'
 import type { AuraLocation, ProjectConfig } from '@/types'
+import { clampCarouselIndex, getTimelineLayout } from '@/lib/timeline'
 
 interface AuraViewerProps {
   config: ProjectConfig
@@ -31,6 +32,10 @@ export default function AuraViewer({ config }: AuraViewerProps) {
     () => views.find((view) => view.id === currentViewId),
     [views, currentViewId]
   )
+
+  useEffect(() => {
+    setCarouselIndex((prev) => clampCarouselIndex(prev, windowWidth, views.length))
+  }, [windowWidth, views.length])
 
   useEffect(() => {
     const updateContainerSize = () => {
@@ -84,20 +89,7 @@ export default function AuraViewer({ config }: AuraViewerProps) {
   }, [currentViewId])
 
   const scrollCarousel = (direction: 'left' | 'right') => {
-    const CARD_WIDTH = 144
-    const CARD_GAP = 12
-    const ARROW_WIDTH = 40
-    const ARROW_GAP = 12
-    const SIDE_PADDING = 48
-
-    const availableWidth =
-      windowWidth - 2 * SIDE_PADDING - 2 * ARROW_WIDTH - 2 * ARROW_GAP
-
-    const maxCardsThatFit = Math.floor(
-      (availableWidth + CARD_GAP) / (CARD_WIDTH + CARD_GAP)
-    )
-    const maxVisibleCards = Math.max(2, Math.min(10, maxCardsThatFit, views.length))
-    const maxIndex = Math.max(0, views.length - maxVisibleCards)
+    const { maxIndex } = getTimelineLayout(windowWidth, views.length)
 
     if (direction === 'left') {
       setCarouselIndex((prev) => Math.max(0, prev - 1))

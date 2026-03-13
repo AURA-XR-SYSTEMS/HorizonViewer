@@ -1,4 +1,5 @@
 import { useMemo } from 'preact/hooks'
+import { getTimelineLayout } from '@/lib/timeline'
 import type { AuraView } from '@/types'
 
 interface TimelineCarouselProps {
@@ -11,6 +12,10 @@ interface TimelineCarouselProps {
   onScrollLeft: () => void
   onScrollRight: () => void
 }
+
+const CARD_WIDTH = 144
+const CARD_HEIGHT = 96
+const CARD_GAP = 12
 
 function ChevronLeft() {
   return (
@@ -58,24 +63,8 @@ export default function TimelineCarousel({
   onScrollLeft,
   onScrollRight,
 }: TimelineCarouselProps) {
-  const CARD_WIDTH = 144
-  const CARD_HEIGHT = 96
-  const CARD_GAP = 12
-  const ARROW_WIDTH = 40
-  const ARROW_GAP = 12
-  const SIDE_PADDING = 48
-
-  const availableWidth = windowWidth - 2 * SIDE_PADDING - 2 * ARROW_WIDTH - 2 * ARROW_GAP
-
-  const maxCardsThatFit = Math.floor(
-    (availableWidth + CARD_GAP) / (CARD_WIDTH + CARD_GAP)
-  )
-  const maxVisibleCards = Math.max(2, Math.min(10, maxCardsThatFit, views.length))
-
-  const validCarouselIndex = Math.min(
-    carouselIndex,
-    Math.max(0, views.length - maxVisibleCards)
-  )
+  const { maxVisibleCards, maxIndex } = getTimelineLayout(windowWidth, views.length)
+  const validCarouselIndex = Math.min(carouselIndex, maxIndex)
 
   const canScrollLeft = validCarouselIndex > 0
   const canScrollRight = validCarouselIndex < views.length - maxVisibleCards
