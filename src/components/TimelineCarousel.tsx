@@ -1,5 +1,5 @@
 import { useMemo } from 'preact/hooks'
-import { getTimelineLayout } from '@/lib/timeline'
+import { CARD_GAP, CARD_HEIGHT, CARD_WIDTH, getTimelineLayout } from '@/lib/timeline'
 import type { AuraView } from '@/types'
 import { TimelineArrow } from './TimelineArrow'
 import TimelineCard from './TimelineCard'
@@ -14,10 +14,6 @@ interface TimelineCarouselProps {
   onScrollLeft: () => void
   onScrollRight: () => void
 }
-
-const CARD_WIDTH = 144
-const CARD_HEIGHT = 96
-const CARD_GAP = 12
 
 export default function TimelineCarousel({
   views,

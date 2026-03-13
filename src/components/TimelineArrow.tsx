@@ -1,3 +1,4 @@
+import { ARROW_COLLAPSED_SIZE, ARROW_EXPANDED_SIZE } from '@/lib/timeline'
 import { ChevronLeft, ChevronRight } from './TimelineChevron'
 
 interface TimelineArrowProps {
@@ -6,9 +7,6 @@ interface TimelineArrowProps {
   enabled: boolean
   onClick: () => void
 }
-
-const ARROW_EXPANDED_SIZE = 40
-const ARROW_COLLAPSED_SIZE = 6
 
 export function TimelineArrow({
   direction,

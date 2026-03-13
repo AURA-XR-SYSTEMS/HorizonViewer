@@ -1,9 +1,14 @@
-const CARD_WIDTH = 144
-const CARD_GAP = 12
-const ARROW_WIDTH = 40
-const ARROW_GAP = 12
-const SIDE_PADDING = 48
-const GLOBAL_MAX_SLOTS = 10
+export const CARD_WIDTH = 144
+export const CARD_HEIGHT = 96
+export const CARD_GAP = 12
+
+export const ARROW_EXPANDED_SIZE = 40
+export const ARROW_COLLAPSED_SIZE = 6
+export const ARROW_WIDTH = 40
+export const ARROW_GAP = 12
+export const SIDE_PADDING = 48
+
+export const GLOBAL_MAX_SLOTS = 10
 
 const getTimelineWidth = () => {
   return 2 * SIDE_PADDING + 2 * ARROW_WIDTH + 2 * ARROW_GAP
