@@ -82,6 +82,10 @@ export default function AuraViewer({ config }: AuraViewerProps) {
       .filter((item): item is VisibleLocationEnumerable => item !== null)
   }, [locations, currentViewId, containerSize, imageNaturalSize])
 
+  const visibleLocationMap = useMemo(() => {
+    return new Map(visibleLocations.map((item) => [item.id, item]))
+  }, [visibleLocations])
+
   useEffect(() => {
     setCarouselIndex((prev) => clampCarouselIndex(prev, windowWidth, views.length))
   }, [windowWidth, views.length])
@@ -187,34 +191,10 @@ export default function AuraViewer({ config }: AuraViewerProps) {
 
       {!isTransitioning && // hide panels during transition
         openPanels.map((panel) => {
-          const viewPosition = panel.location.viewPositions.find(
-            (position) => position.viewId === currentViewId
-          )
-
-          if (!viewPosition) {
-            return null
-          }
-
-          const id = panel.location.id
-          const pinPos = calculatePinPosition(
-            viewPosition.x,
-            viewPosition.y,
-            containerSize,
-            imageNaturalSize
-          )
-
-          if (!pinPos.visible) {
-            return null
-          }
-
-          return (
-            <LocationPanel
-              key={id}
-              location={panel.location}
-              left={pinPos.left}
-              top={pinPos.top}
-            />
-          )
+          const visibleLocation = visibleLocationMap.get(panel.location.id)
+          if (!visibleLocation) return null
+          const { id, location, left, top } = visibleLocation
+          return <LocationPanel key={id} location={location} left={left} top={top} />
         })}
 
       <div className="rounded-pill bg-surface-overlay absolute top-4 left-4 z-50 px-3 py-2 text-sm">
