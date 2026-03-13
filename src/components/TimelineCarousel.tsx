@@ -1,15 +1,15 @@
-import { useMemo } from 'preact/hooks';
-import type { AuraView } from '@/types';
+import { useMemo } from 'preact/hooks'
+import type { AuraView } from '@/types'
 
 interface TimelineCarouselProps {
-  views: AuraView[];
-  currentViewId: number;
-  expanded: boolean;
-  carouselIndex: number;
-  windowWidth: number;
-  onSelectView: (viewId: number) => void;
-  onScrollLeft: () => void;
-  onScrollRight: () => void;
+  views: AuraView[]
+  currentViewId: number
+  expanded: boolean
+  carouselIndex: number
+  windowWidth: number
+  onSelectView: (viewId: number) => void
+  onScrollLeft: () => void
+  onScrollRight: () => void
 }
 
 function ChevronLeft() {
@@ -27,7 +27,7 @@ function ChevronLeft() {
     >
       <path d="m15 18-6-6 6-6" />
     </svg>
-  );
+  )
 }
 
 function ChevronRight() {
@@ -45,7 +45,7 @@ function ChevronRight() {
     >
       <path d="m9 18 6-6-6-6" />
     </svg>
-  );
+  )
 }
 
 export default function TimelineCarousel({
@@ -58,33 +58,34 @@ export default function TimelineCarousel({
   onScrollLeft,
   onScrollRight,
 }: TimelineCarouselProps) {
-  const CARD_WIDTH = 144;
-  const CARD_HEIGHT = 96;
-  const CARD_GAP = 12;
-  const ARROW_WIDTH = 40;
-  const ARROW_GAP = 12;
-  const SIDE_PADDING = 48;
+  const CARD_WIDTH = 144
+  const CARD_HEIGHT = 96
+  const CARD_GAP = 12
+  const ARROW_WIDTH = 40
+  const ARROW_GAP = 12
+  const SIDE_PADDING = 48
 
-  const availableWidth =
-    windowWidth - 2 * SIDE_PADDING - 2 * ARROW_WIDTH - 2 * ARROW_GAP;
+  const availableWidth = windowWidth - 2 * SIDE_PADDING - 2 * ARROW_WIDTH - 2 * ARROW_GAP
 
-  const maxCardsThatFit = Math.floor((availableWidth + CARD_GAP) / (CARD_WIDTH + CARD_GAP));
-  const maxVisibleCards = Math.max(2, Math.min(10, maxCardsThatFit, views.length));
+  const maxCardsThatFit = Math.floor(
+    (availableWidth + CARD_GAP) / (CARD_WIDTH + CARD_GAP)
+  )
+  const maxVisibleCards = Math.max(2, Math.min(10, maxCardsThatFit, views.length))
 
   const validCarouselIndex = Math.min(
     carouselIndex,
     Math.max(0, views.length - maxVisibleCards)
-  );
+  )
 
-  const canScrollLeft = validCarouselIndex > 0;
-  const canScrollRight = validCarouselIndex < views.length - maxVisibleCards;
+  const canScrollLeft = validCarouselIndex > 0
+  const canScrollRight = validCarouselIndex < views.length - maxVisibleCards
 
   const visibleViews = useMemo(() => {
     if (!expanded) {
-      return views.slice(validCarouselIndex, validCarouselIndex + maxVisibleCards);
+      return views.slice(validCarouselIndex, validCarouselIndex + maxVisibleCards)
     }
-    return views;
-  }, [expanded, views, validCarouselIndex, maxVisibleCards]);
+    return views
+  }, [expanded, views, validCarouselIndex, maxVisibleCards])
 
   return (
     <div className="absolute inset-x-0 bottom-6 flex justify-center">
@@ -97,10 +98,10 @@ export default function TimelineCarousel({
           <button
             type="button"
             onClick={onScrollLeft}
-            className={`flex items-center justify-center text-aura-black transition-all duration-300 ${
+            className={`text-aura-black flex items-center justify-center transition-all duration-300 ${
               expanded
-                ? 'h-10 w-10 rounded-pill bg-white/90 shadow-card hover:scale-105 hover:bg-aura-white'
-                : 'h-1.5 w-1.5 rounded-pill bg-white/40 hover:bg-white/60'
+                ? 'rounded-pill shadow-card hover:bg-aura-white h-10 w-10 bg-white/90 hover:scale-105'
+                : 'rounded-pill h-1.5 w-1.5 bg-white/40 hover:bg-white/60'
             }`}
           >
             {expanded && <ChevronLeft />}
@@ -128,15 +129,15 @@ export default function TimelineCarousel({
             }}
           >
             {visibleViews.map((view, index) => {
-              const actualIndex = expanded ? index : validCarouselIndex + index;
-              const isActive = view.id === currentViewId;
+              const actualIndex = expanded ? index : validCarouselIndex + index
+              const isActive = view.id === currentViewId
               const isInWindow =
                 actualIndex >= validCarouselIndex &&
-                actualIndex < validCarouselIndex + maxVisibleCards;
+                actualIndex < validCarouselIndex + maxVisibleCards
 
-              const width = expanded ? CARD_WIDTH : isActive ? 10 : 6;
-              const height = expanded ? CARD_HEIGHT : isActive ? 10 : 6;
-              const borderRadius = expanded ? 12 : isActive ? 5 : 3;
+              const width = expanded ? CARD_WIDTH : isActive ? 10 : 6
+              const height = expanded ? CARD_HEIGHT : isActive ? 10 : 6
+              const borderRadius = expanded ? 12 : isActive ? 5 : 3
 
               return (
                 <button
@@ -177,8 +178,10 @@ export default function TimelineCarousel({
                   />
 
                   <span
-                    className={`absolute left-3 top-2 leading-none tracking-tight ${
-                      isActive ? 'text-2xl font-light text-aura-white' : 'text-xl font-light text-white/80'
+                    className={`absolute top-2 left-3 leading-none tracking-tight ${
+                      isActive
+                        ? 'text-aura-white text-2xl font-light'
+                        : 'text-xl font-light text-white/80'
                     }`}
                     style={{
                       opacity: expanded ? 1 : 0,
@@ -189,8 +192,10 @@ export default function TimelineCarousel({
                   </span>
 
                   <span
-                    className={`absolute bottom-2 left-3 right-3 truncate text-left leading-tight ${
-                      isActive ? 'text-sm font-medium text-aura-white' : 'text-xs font-medium text-white/80'
+                    className={`absolute right-3 bottom-2 left-3 truncate text-left leading-tight ${
+                      isActive
+                        ? 'text-aura-white text-sm font-medium'
+                        : 'text-xs font-medium text-white/80'
                     }`}
                     style={{
                       opacity: expanded ? 1 : 0,
@@ -200,7 +205,7 @@ export default function TimelineCarousel({
                     {view.name}
                   </span>
                 </button>
-              );
+              )
             })}
           </div>
         </div>
@@ -209,10 +214,10 @@ export default function TimelineCarousel({
           <button
             type="button"
             onClick={onScrollRight}
-            className={`flex items-center justify-center text-aura-black transition-all duration-300 ${
+            className={`text-aura-black flex items-center justify-center transition-all duration-300 ${
               expanded
-                ? 'h-10 w-10 rounded-pill bg-white/90 shadow-card hover:scale-105 hover:bg-aura-white'
-                : 'h-1.5 w-1.5 rounded-pill bg-white/40 hover:bg-white/60'
+                ? 'rounded-pill shadow-card hover:bg-aura-white h-10 w-10 bg-white/90 hover:scale-105'
+                : 'rounded-pill h-1.5 w-1.5 bg-white/40 hover:bg-white/60'
             }`}
           >
             {expanded && <ChevronRight />}
@@ -220,5 +225,5 @@ export default function TimelineCarousel({
         )}
       </div>
     </div>
-  );
+  )
 }

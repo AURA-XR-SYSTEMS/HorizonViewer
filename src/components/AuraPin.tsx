@@ -1,13 +1,13 @@
-import type { TargetedMouseEvent } from 'preact';
-import type { AuraLocation } from '@/types';
+import type { TargetedMouseEvent } from 'preact'
+import type { AuraLocation } from '@/types'
 
 interface AuraPinProps {
-  location: AuraLocation;
-  left: string;
-  top: string;
-  isVisible: boolean;
-  isSelected: boolean;
-  onClick: (location: AuraLocation, left: string, top: string) => void;
+  location: AuraLocation
+  left: string
+  top: string
+  isVisible: boolean
+  isSelected: boolean
+  onClick: (location: AuraLocation) => void
 }
 
 export default function AuraPin({
@@ -19,9 +19,9 @@ export default function AuraPin({
   onClick,
 }: AuraPinProps) {
   const handlePinClick = (e: TargetedMouseEvent<SVGSVGElement>) => {
-    e.stopPropagation();
-    onClick(location, left, top);
-  };
+    e.stopPropagation()
+    onClick(location)
+  }
 
   return (
     <div
@@ -53,5 +53,5 @@ export default function AuraPin({
         />
       </svg>
     </div>
-  );
+  )
 }

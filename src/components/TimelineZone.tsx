@@ -1,12 +1,12 @@
-import { useEffect, useRef } from 'preact/hooks';
-import type { ComponentChildren } from 'preact';
+import { useEffect, useRef } from 'preact/hooks'
+import type { ComponentChildren } from 'preact'
 
 interface TimelineZoneProps {
-  expanded: boolean;
-  onExpand: () => void;
-  onCollapse: () => void;
-  collapseDelay?: number;
-  children: ComponentChildren;
+  expanded: boolean
+  onExpand: () => void
+  onCollapse: () => void
+  collapseDelay?: number
+  children: ComponentChildren
 }
 
 export default function TimelineZone({
@@ -16,33 +16,33 @@ export default function TimelineZone({
   collapseDelay = 1000,
   children,
 }: TimelineZoneProps) {
-  const collapseTimeoutRef = useRef<number | null>(null);
+  const collapseTimeoutRef = useRef<number | null>(null)
 
   const clearCollapseTimeout = () => {
     if (collapseTimeoutRef.current !== null) {
-      window.clearTimeout(collapseTimeoutRef.current);
-      collapseTimeoutRef.current = null;
+      window.clearTimeout(collapseTimeoutRef.current)
+      collapseTimeoutRef.current = null
     }
-  };
+  }
 
   const handleMouseEnter = () => {
-    clearCollapseTimeout();
-    onExpand();
-  };
+    clearCollapseTimeout()
+    onExpand()
+  }
 
   const handleMouseLeave = () => {
-    clearCollapseTimeout();
+    clearCollapseTimeout()
     collapseTimeoutRef.current = window.setTimeout(() => {
-      onCollapse();
-      collapseTimeoutRef.current = null;
-    }, collapseDelay);
-  };
+      onCollapse()
+      collapseTimeoutRef.current = null
+    }, collapseDelay)
+  }
 
   useEffect(() => {
     return () => {
-      clearCollapseTimeout();
-    };
-  }, []);
+      clearCollapseTimeout()
+    }
+  }, [])
 
   return (
     <div
@@ -53,5 +53,5 @@ export default function TimelineZone({
     >
       {children}
     </div>
-  );
+  )
 }
