@@ -5,7 +5,8 @@ interface Size {
 }
 
 interface ViewerLayout {
-  containerRef: ReturnType<typeof useRef<HTMLDivElement | null>>
+  //   containerRef: ReturnType<typeof useRef<HTMLDivElement | null>>
+  containerRef: preact.RefObject<HTMLDivElement>
   containerSize: Size
   windowWidth: number
 }
