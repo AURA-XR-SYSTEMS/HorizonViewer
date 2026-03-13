@@ -1,6 +1,7 @@
 import { useMemo } from 'preact/hooks'
 import { getTimelineLayout } from '@/lib/timeline'
 import type { AuraView } from '@/types'
+import { ChevronLeft, ChevronRight } from './TimelineChevron'
 
 interface TimelineCarouselProps {
   views: AuraView[]
@@ -18,42 +19,6 @@ const CARD_HEIGHT = 96
 const CARD_GAP = 12
 const ARROW_EXPANDED_SIZE = 40
 const ARROW_COLLAPSED_SIZE = 6
-
-function ChevronLeft() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m15 18-6-6 6-6" />
-    </svg>
-  )
-}
-
-function ChevronRight() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m9 18 6-6-6-6" />
-    </svg>
-  )
-}
 
 export default function TimelineCarousel({
   views,
