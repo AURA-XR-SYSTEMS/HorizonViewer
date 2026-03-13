@@ -12,8 +12,6 @@ interface AuraViewerProps {
 
 interface OpenPanel {
   location: AuraLocation;
-  left: string;
-  top: string;
 }
 
 export default function AuraViewer({ config }: AuraViewerProps) {
@@ -139,7 +137,7 @@ export default function AuraViewer({ config }: AuraViewerProps) {
               top={pinPos.top}
               isVisible={true}
               isSelected={openPanels.some((panel) => panel.location.id === location.id)}
-              onClick={(loc, left, top) => {
+              onClick={(loc) => {
                 const isAlreadyOpen = openPanels.some((panel) => panel.location.id === loc.id);
 
                 if (isAlreadyOpen) {
@@ -147,7 +145,7 @@ export default function AuraViewer({ config }: AuraViewerProps) {
                     prev.filter((panel) => panel.location.id !== loc.id)
                   );
                 } else {
-                  setOpenPanels((prev) => [...prev, { location: loc, left, top }]);
+                  setOpenPanels((prev) => [...prev, { location: loc }]);
                 }
               }}
             />
@@ -155,14 +153,37 @@ export default function AuraViewer({ config }: AuraViewerProps) {
         })}
       </div>
 
-      {openPanels.map((panel) => (
-        <LocationPanel
-          key={panel.location.id}
-          location={panel.location}
-          left={panel.left}
-          top={panel.top}
-        />
-      ))}
+      {
+        openPanels.map((panel) => {
+            const viewPosition = panel.location.viewPositions.find(
+                (position) => position.viewId === currentViewId);
+
+            if (!viewPosition) {
+                return null;
+            }
+
+            const id = panel.location.id
+            const pinPos = calculatePinPosition(
+                viewPosition.x,
+                viewPosition.y,
+                containerSize,
+                imageNaturalSize
+            );
+
+            if (!pinPos.visible) {
+                return null;
+            }
+
+            return (
+                <LocationPanel
+                    key={id}
+                    location={panel.location}
+                    left={pinPos.left}
+                    top={pinPos.top}
+                />
+            )
+        })
+      }
 
       <div className="absolute left-4 top-4 z-10 rounded-pill bg-surface-overlay px-3 py-2 text-sm">
         Current view: {currentView?.name ?? 'Unknown'}
