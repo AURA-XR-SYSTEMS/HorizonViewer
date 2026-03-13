@@ -34,8 +34,7 @@ export function getTimelineLayout(
   const availableWidth = windowWidth - getTimelineWidth()
   const maxSlots = getMaxDisplayableCards(availableWidth)
   const maxVisibleCards = getNumVisibleCards(maxSlots, totalViews)
-  // consider 15 views, but we can only see 10, so max visible index is 15-10 = 5 ...? I don't get it
-  const maxIndex = Math.max(0, totalViews - maxVisibleCards)
+  const maxIndex = Math.max(0, totalViews - maxVisibleCards) // maximium visible card index, account for slide
 
   return {
     maxVisibleCards,
