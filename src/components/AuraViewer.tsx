@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import AuraPin from '@/components/AuraPin';
+import LocationPanel from '@/components/LocationPanel';
 import { calculatePinPosition } from '@/lib/pinPosition';
 import type { AuraLocation, ProjectConfig } from '@/types';
 
@@ -111,6 +112,15 @@ export default function AuraViewer({ config }: AuraViewerProps) {
           );
         })}
       </div>
+
+      {openPanels.map((panel) => (
+        <LocationPanel
+          key={panel.location.id}
+          location={panel.location}
+          left={panel.left}
+          top={panel.top}
+        />
+      ))}
 
       <div className="absolute left-4 top-4 z-10 rounded-pill bg-surface-overlay px-3 py-2 text-sm">
         Current view: {currentView?.name ?? 'Unknown'}
