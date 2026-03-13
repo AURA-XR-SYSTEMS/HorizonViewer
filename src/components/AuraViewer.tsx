@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useEffect, useMemo, useState } from 'preact/hooks'
 import AuraPin from '@/components/AuraPin'
 import LocationPanel from '@/components/LocationPanel'
 import TimelineCarousel from '@/components/TimelineCarousel'
@@ -11,6 +11,7 @@ import {
   getCarouselIndexForView,
 } from '@/lib/timeline'
 import { useViewerLayout } from '@/hooks/useViewerLayout'
+import { useAuraTransitions } from '@/hooks/useAuraTransitions'
 
 interface AuraViewerProps {
   config: ProjectConfig
@@ -28,19 +29,25 @@ interface VisibleLocationEnumerable {
 }
 
 export default function AuraViewer({ config }: AuraViewerProps) {
-  const { views, locations } = config
+  const { views, locations, transitions } = config
 
   const [currentViewId, setCurrentViewId] = useState(views[0]?.id ?? 1)
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 1920, height: 1080 })
   const [openPanels, setOpenPanels] = useState<OpenPanel[]>([])
   const [timelineExpanded, setTimelineExpanded] = useState(false)
   const [carouselIndex, setCarouselIndex] = useState(0)
-  const [isTransitioning, setIsTransitioning] = useState(false)
-  const [activeTransitionKey, setActiveTransitionKey] = useState<string | null>(null)
-  const [showStaticImage, setShowStaticImage] = useState(true)
-
   const { containerRef, containerSize, windowWidth } = useViewerLayout()
-  const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({})
+  const {
+    videoRefs,
+    isTransitioning,
+    activeTransitionKey,
+    showStaticImage,
+    transitionToView,
+  } = useAuraTransitions({
+    currentViewId,
+    transitions,
+    onViewChange: setCurrentViewId,
+  })
 
   const currentView = useMemo(
     () => views.find((view) => view.id === currentViewId),
@@ -117,61 +124,13 @@ export default function AuraViewer({ config }: AuraViewerProps) {
 
   // preload transition videos
   useEffect(() => {
-    config.transitions.forEach((t) => {
+    transitions.forEach((t) => {
       const video = videoRefs.current[t.key]
       if (video) {
         video.load()
       }
     })
-  }, [config.transitions])
-
-  const handleSelectView = (viewId: number) => {
-    handleTransition(viewId)
-  }
-
-  const handleTransition = (targetId: number) => {
-    if (isTransitioning || targetId === currentViewId) return
-
-    const transitionKey = `${currentViewId}-${targetId}`
-    const transition = config.transitions.find((t) => t.key === transitionKey)
-
-    if (!transition) {
-      setCurrentViewId(targetId)
-      return
-    }
-
-    const video = videoRefs.current[transitionKey]
-
-    if (!video) {
-      setCurrentViewId(targetId)
-      return
-    }
-
-    setActiveTransitionKey(transitionKey)
-    setIsTransitioning(true)
-
-    video.onended = () => {
-      setCurrentViewId(targetId)
-      setShowStaticImage(true)
-      setIsTransitioning(false)
-      setActiveTransitionKey(null)
-    }
-
-    const onSeeked = () => {
-      video.removeEventListener('seeked', onSeeked)
-      setShowStaticImage(false)
-      video.play().catch((error) => {
-        console.error('Video play failed:', error)
-        setCurrentViewId(targetId)
-        setShowStaticImage(true)
-        setIsTransitioning(false)
-        setActiveTransitionKey(null)
-      })
-    }
-
-    video.addEventListener('seeked', onSeeked)
-    video.currentTime = 0
-  }
+  }, [transitions])
 
   const isPanelOpen = (locationId: string) =>
     openPanels.some((panel) => panel.location.id === locationId)
@@ -186,7 +145,7 @@ export default function AuraViewer({ config }: AuraViewerProps) {
 
   return (
     <div className="bg-aura-black text-text-primary relative h-full w-full overflow-hidden">
-      {config.transitions.map((t) => (
+      {transitions.map((t) => (
         <div
           key={t.key}
           className={`absolute inset-0 ${activeTransitionKey === t.key ? 'z-10' : 'z-0'}`}
@@ -273,7 +232,7 @@ export default function AuraViewer({ config }: AuraViewerProps) {
           expanded={timelineExpanded}
           carouselIndex={carouselIndex}
           windowWidth={windowWidth}
-          onSelectView={handleSelectView}
+          onSelectView={transitionToView}
           onScrollLeft={() => scrollCarousel('left')}
           onScrollRight={() => scrollCarousel('right')}
         />
