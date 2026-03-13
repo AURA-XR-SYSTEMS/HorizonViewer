@@ -126,18 +126,55 @@ export default function AuraViewer({ config }: AuraViewerProps) {
   }, [config.transitions])
 
   const handleSelectView = (viewId: number) => {
-    setCurrentViewId(viewId)
+    handleTransition(viewId)
+  }
+
+  const handleTransition = (targetId: number) => {
+    if (isTransitioning || targetId === currentViewId) return
+
+    const transitionKey = `${currentViewId}-${targetId}`
+    const transition = config.transitions.find((t) => t.key === transitionKey)
+
+    if (!transition) {
+      setCurrentViewId(targetId)
+      return
+    }
+
+    const video = videoRefs.current[transitionKey]
+
+    if (!video) {
+      setCurrentViewId(targetId)
+      return
+    }
+
+    setActiveTransitionKey(transitionKey)
+    setIsTransitioning(true)
+
+    video.onended = () => {
+      setCurrentViewId(targetId)
+      setShowStaticImage(true)
+      setIsTransitioning(false)
+      setActiveTransitionKey(null)
+    }
+
+    const onSeeked = () => {
+      video.removeEventListener('seeked', onSeeked)
+      setShowStaticImage(false)
+      video.play().catch((error) => {
+        console.error('Video play failed:', error)
+        setCurrentViewId(targetId)
+        setShowStaticImage(true)
+        setIsTransitioning(false)
+        setActiveTransitionKey(null)
+      })
+    }
+
+    video.addEventListener('seeked', onSeeked)
+    video.currentTime = 0
   }
 
   return (
     <div className="bg-aura-black text-text-primary relative h-full w-full overflow-hidden">
-      {/* <div
-        ref={containerRef}
-        className="absolute inset-0 bg-cover bg-center"
-        style={{
-          backgroundImage: currentView ? `url(${currentView.imageUrl})` : undefined,
-        }}
-      ></div> */}
       {config.transitions.map((t) => (
         <div
           key={t.key}
@@ -158,7 +195,7 @@ export default function AuraViewer({ config }: AuraViewerProps) {
 
       <div
         ref={containerRef}
-        className={`absolute inset-0 z-20 ${
+        className={`absolute inset-0 z-20 bg-cover bg-center ${
           showStaticImage ? 'opacity-100' : 'opacity-0'
         }`}
         style={{
@@ -187,7 +224,7 @@ export default function AuraViewer({ config }: AuraViewerProps) {
               location={location}
               left={pinPos.left}
               top={pinPos.top}
-              isVisible={true}
+              isVisible={!isTransitioning}
               isSelected={openPanels.some((panel) => panel.location.id === location.id)}
               onClick={(loc) => {
                 if (openPanels.some((panel) => panel.location.id === loc.id)) {
@@ -203,38 +240,39 @@ export default function AuraViewer({ config }: AuraViewerProps) {
         })}
       </div>
 
-      {openPanels.map((panel) => {
-        const viewPosition = panel.location.viewPositions.find(
-          (position) => position.viewId === currentViewId
-        )
+      {!isTransitioning && // hide panels during transition
+        openPanels.map((panel) => {
+          const viewPosition = panel.location.viewPositions.find(
+            (position) => position.viewId === currentViewId
+          )
 
-        if (!viewPosition) {
-          return null
-        }
+          if (!viewPosition) {
+            return null
+          }
 
-        const id = panel.location.id
-        const pinPos = calculatePinPosition(
-          viewPosition.x,
-          viewPosition.y,
-          containerSize,
-          imageNaturalSize
-        )
+          const id = panel.location.id
+          const pinPos = calculatePinPosition(
+            viewPosition.x,
+            viewPosition.y,
+            containerSize,
+            imageNaturalSize
+          )
 
-        if (!pinPos.visible) {
-          return null
-        }
+          if (!pinPos.visible) {
+            return null
+          }
 
-        return (
-          <LocationPanel
-            key={id}
-            location={panel.location}
-            left={pinPos.left}
-            top={pinPos.top}
-          />
-        )
-      })}
+          return (
+            <LocationPanel
+              key={id}
+              location={panel.location}
+              left={pinPos.left}
+              top={pinPos.top}
+            />
+          )
+        })}
 
-      <div className="rounded-pill bg-surface-overlay absolute top-4 left-4 z-10 px-3 py-2 text-sm">
+      <div className="rounded-pill bg-surface-overlay absolute top-4 left-4 z-50 px-3 py-2 text-sm">
         Current view: {currentView?.name ?? 'Unknown'}
       </div>
 
