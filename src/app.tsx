@@ -1,5 +1,4 @@
 import AuraViewer from '@components/AuraViewer'
-import { sampleConfig } from '@data/sampleConfig'
 import type { ProjectConfig } from './types'
 import { useEffect, useState } from 'preact/hooks'
 import { fetchProjectConfig } from './lib/api'
@@ -14,9 +13,11 @@ export default function App() {
     setError(null)
     fetchProjectConfig()
       .then(setConfig)
-      .then(() => setLoading(false))
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Unknown error')
+      })
+      .finally(() => {
+        setLoading(false)
       })
   }, [])
 

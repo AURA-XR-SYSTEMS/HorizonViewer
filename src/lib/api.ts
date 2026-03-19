@@ -44,20 +44,51 @@ export const ProjectConfigSchema = z.object({
   transitions: z.array(TransitionSchema),
 })
 
+const ExportConfigEnvelopeSchema = z.object({
+  exportId: z.string(),
+  config: ProjectConfigSchema,
+})
+
+function getExportId(): string {
+  const params = new URLSearchParams(window.location.search)
+  return params.get('exportId') ?? import.meta.env.VITE_HORIZON_EXPORT_ID ?? 'demo-export'
+}
+
+function getConfigUrl(): string {
+  const directConfigUrl = import.meta.env.VITE_HORIZON_CONFIG_URL
+  if (directConfigUrl) {
+    return directConfigUrl
+  }
+
+  const apiBaseUrl = import.meta.env.VITE_HORIZON_API_BASE_URL
+  if (!apiBaseUrl) {
+    throw new Error(
+      'Missing Horizon config settings. Set VITE_HORIZON_CONFIG_URL or VITE_HORIZON_API_BASE_URL.'
+    )
+  }
+
+  const exportId = encodeURIComponent(getExportId())
+  return `${apiBaseUrl.replace(/\/$/, '')}/exports/${exportId}/config`
+}
+
 export async function fetchProjectConfig(): Promise<ProjectConfig> {
-  const response = await fetch(import.meta.env.VITE_HORIZON_CONFIG_URL)
+  const response = await fetch(getConfigUrl())
 
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`)
   }
 
   const raw = await response.json()
-  console.log(raw)
-  const result = ProjectConfigSchema.safeParse(raw)
-  if (!result.success) {
-    console.error('ProjectConfigSchema validation failed', result.error)
+  const directConfigResult = ProjectConfigSchema.safeParse(raw)
+  if (directConfigResult.success) {
+    return mapApiConfig(directConfigResult.data)
+  }
+
+  const exportConfigResult = ExportConfigEnvelopeSchema.safeParse(raw)
+  if (!exportConfigResult.success) {
+    console.error('ProjectConfigSchema validation failed', exportConfigResult.error)
     throw new Error('Invalid project config response')
   }
-  const config = result.data
-  return mapApiConfig(config)
+
+  return mapApiConfig(exportConfigResult.data.config)
 }

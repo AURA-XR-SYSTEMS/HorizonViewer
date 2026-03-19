@@ -9,8 +9,8 @@ interface TimelineZoneProps {
   children: ComponentChildren
 }
 
+/* note: `expanded` prop is available. It is not explicitly needed but may be useful later for internal styling */
 export default function TimelineZone({
-  expanded, // not explicitly needed but may be useful later for internal styling
   onExpand,
   onCollapse,
   collapseDelay = 1000,
