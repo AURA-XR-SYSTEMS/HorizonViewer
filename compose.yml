@@ -1,0 +1,15 @@
+name: horizon-viewer-dev
+
+services:
+  horizon-viewer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_HORIZON_API_BASE_URL: ${VITE_HORIZON_API_BASE_URL:-http://localhost:8000}
+        VITE_HORIZON_CONFIG_URL: ${VITE_HORIZON_CONFIG_URL:-}
+        VITE_HORIZON_EXPORT_ID: ${VITE_HORIZON_EXPORT_ID:-demo-export}
+    container_name: horizon-viewer
+    restart: unless-stopped
+    ports:
+      - "3001:8080"
