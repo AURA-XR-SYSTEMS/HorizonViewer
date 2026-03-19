@@ -1,4 +1,5 @@
 import AuraViewer from '@components/AuraViewer'
+// import { sampleConfig } from '@data/sampleConfig'
 import type { ProjectConfig } from './types'
 import { useEffect, useState } from 'preact/hooks'
 import { fetchProjectConfig } from './lib/api'
