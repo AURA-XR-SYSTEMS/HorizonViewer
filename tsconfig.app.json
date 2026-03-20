@@ -15,6 +15,7 @@
       "@data/*": ["src/data/*"],
       "@lib/*": ["src/lib/*"],
       "@types/*": ["src/types/*"],
+      "@hooks/*": ["src/hooks/*"],
 
       "react": ["./node_modules/preact/compat/"],
       "react-dom": ["./node_modules/preact/compat/"]
