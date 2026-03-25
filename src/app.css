@@ -79,3 +79,30 @@ body,
     transform: rotate(360deg);
   }
 }
+
+.viewer-shell-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.2), transparent 28%),
+    linear-gradient(160deg, #020617 0%, #0f172a 54%, #111827 100%);
+  color: rgba(255, 255, 255, 0.88);
+  text-align: center;
+}
+
+.viewer-shell-error {
+  color: #fecaca;
+}
+
+.viewer-shell-muted {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.admin-panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.24) transparent;
+}
