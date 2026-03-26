@@ -119,7 +119,7 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
   }, [autoPoll, job?.exportId, job?.status, workspaceId])
 
   return (
-    <aside className="admin-panel absolute top-4 right-4 z-[70] flex max-h-[calc(100%-2rem)] w-[min(440px,calc(100%-2rem))] flex-col overflow-hidden rounded-[var(--radius-panel)] border border-white/25 bg-black/78 text-left text-white shadow-2xl backdrop-blur-xl">
+    <aside data-testid="admin-panel" className="admin-panel absolute top-4 right-4 z-[70] flex max-h-[calc(100%-2rem)] w-[min(440px,calc(100%-2rem))] flex-col overflow-hidden rounded-[var(--radius-panel)] border border-white/25 bg-black/78 text-left text-white shadow-2xl backdrop-blur-xl">
       <div className="border-b border-white/10 px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -141,12 +141,14 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
             Workspace ID
           </label>
           <input
+            data-testid="workspace-input"
             className="w-full rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm text-white outline-none transition focus:border-sky-300/60 focus:bg-white/12"
             value={workspaceId}
             onInput={(event) => setWorkspaceId((event.target as HTMLInputElement).value)}
             placeholder="workspace-123"
           />
           <button
+            data-testid="create-job-button"
             className="w-full rounded-xl bg-sky-500 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/40"
             onClick={() => void handleCreateExportJob()}
             disabled={!canCreate}
@@ -158,22 +160,22 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
         <section className="space-y-3 rounded-2xl border border-white/10 bg-white/4 p-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-white">Current Job</h3>
-            <span className="rounded-full border border-white/10 bg-white/6 px-2 py-1 text-xs text-white/72">
+            <span data-testid="job-status" className="rounded-full border border-white/10 bg-white/6 px-2 py-1 text-xs text-white/72">
               {job?.status ?? 'none'}
             </span>
           </div>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm text-white/78">
             <dt className="text-white/48">Export ID</dt>
-            <dd className="break-all font-mono text-[12px]">{job?.exportId ?? 'Not created yet'}</dd>
+            <dd data-testid="job-export-id" className="break-all font-mono text-[12px]">{job?.exportId ?? 'Not created yet'}</dd>
             <dt className="text-white/48">Workspace</dt>
             <dd>{job?.workspaceId ?? (workspaceId || 'Unset')}</dd>
             <dt className="text-white/48">Viewer URL</dt>
             <dd className="break-all">{job?.viewerUrl ?? 'null'}</dd>
             <dt className="text-white/48">Error</dt>
-            <dd className="break-words text-rose-200">{job?.errorMessage ?? 'none'}</dd>
+            <dd data-testid="job-error-message" className="break-words text-rose-200">{job?.errorMessage ?? 'none'}</dd>
           </dl>
           {bootstrapLimitation ? (
-            <p className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm leading-5 text-amber-100">
+            <p data-testid="bootstrap-limitation" className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm leading-5 text-amber-100">
               {bootstrapLimitation}
             </p>
           ) : null}
@@ -184,6 +186,7 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
             Export Zip
           </label>
           <input
+            data-testid="upload-file-input"
             className="block w-full text-sm text-white/78 file:mr-3 file:rounded-lg file:border-0 file:bg-white/14 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-white/18"
             type="file"
             accept=".zip,application/zip"
@@ -196,6 +199,7 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
             <code>file</code> field. Metadata upload is not wired yet.
           </p>
           <button
+            data-testid="upload-button"
             className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/16 disabled:cursor-not-allowed disabled:bg-white/8 disabled:text-white/35"
             onClick={() => void handleUploadExport()}
             disabled={!canUpload}
@@ -209,6 +213,7 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
             <h3 className="text-sm font-semibold text-white">Polling</h3>
             <label className="flex items-center gap-2 text-sm text-white/72">
               <input
+                data-testid="auto-poll-checkbox"
                 type="checkbox"
                 checked={autoPoll}
                 onChange={(event) => setAutoPoll((event.target as HTMLInputElement).checked)}
@@ -217,6 +222,7 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
             </label>
           </div>
           <button
+            data-testid="poll-button"
             className="w-full rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/16 disabled:cursor-not-allowed disabled:bg-white/8 disabled:text-white/35"
             onClick={() => void handlePollStatus()}
             disabled={!canPoll}
@@ -225,7 +231,7 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
           </button>
         </section>
 
-        <section className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/55 p-3">
+        <section data-testid="last-request-panel" className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/55 p-3">
           <h3 className="text-sm font-semibold text-white">Last Request</h3>
           <div className="space-y-2 text-sm text-white/78">
             <p>
@@ -240,18 +246,18 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
           </div>
         </section>
 
-        <section className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/55 p-3">
+        <section data-testid="last-response-panel" className="space-y-3 rounded-2xl border border-white/10 bg-slate-950/55 p-3">
           <h3 className="text-sm font-semibold text-white">Last Response</h3>
           <p className="text-sm text-white/72">
             HTTP status: <span className="font-medium text-white">{lastResponse?.status ?? 'n/a'}</span>
           </p>
-          <pre className="max-h-56 overflow-auto rounded-xl bg-black/45 p-3 text-xs leading-5 text-white/80">
+          <pre data-testid="last-response-payload" className="max-h-56 overflow-auto rounded-xl bg-black/45 p-3 text-xs leading-5 text-white/80">
             {prettyPrint(lastResponse?.payload ?? null)}
           </pre>
         </section>
 
         {lastError ? (
-          <section className="rounded-2xl border border-rose-400/30 bg-rose-500/14 p-3 text-sm text-rose-100">
+          <section data-testid="last-error-panel" className="rounded-2xl border border-rose-400/30 bg-rose-500/14 p-3 text-sm text-rose-100">
             <h3 className="text-sm font-semibold">Last Error</h3>
             <p className="mt-2 break-words">{lastError}</p>
           </section>

@@ -1,4 +1,9 @@
-import { ExportJobResponseSchema, type ExportJobResponse } from './exportJobSchemas'
+import {
+  CreateExportJobResponseSchema,
+  ExportJobResponseSchema,
+  type CreateExportJobResponse,
+  type ExportJobResponse,
+} from './exportJobSchemas'
 
 export interface DebugRequest {
   method: 'POST' | 'GET'
@@ -35,6 +40,39 @@ async function parseResponse(response: Response): Promise<unknown> {
   return text ? { detail: text } : null
 }
 
+function jobResponseFromCreateResponse(job: CreateExportJobResponse): ExportJobResponse {
+  return {
+    ...job,
+    errorMessage: null,
+  }
+}
+
+async function expectCreateJobResponse(
+  response: Response
+): Promise<DebugResponse & { job: ExportJobResponse }> {
+  const payload = await parseResponse(response)
+
+  if (!response.ok) {
+    const detail =
+      payload && typeof payload === 'object' && 'detail' in payload
+        ? String((payload as { detail: unknown }).detail)
+        : `Request failed: ${response.status}`
+    throw new Error(detail)
+  }
+
+  const result = CreateExportJobResponseSchema.safeParse(payload)
+  if (!result.success) {
+    console.error('CreateExportJobResponseSchema validation failed', result.error)
+    throw new Error('Invalid export job response')
+  }
+
+  return {
+    status: response.status,
+    payload,
+    job: jobResponseFromCreateResponse(result.data),
+  }
+}
+
 async function expectJobResponse(response: Response): Promise<DebugResponse & { job: ExportJobResponse }> {
   const payload = await parseResponse(response)
 
@@ -68,7 +106,7 @@ export async function createExportJob(workspaceId: string): Promise<ExportJobApi
   }
 
   const response = await fetch(url, { method: 'POST' })
-  const { job, status, payload } = await expectJobResponse(response)
+  const { job, status, payload } = await expectCreateJobResponse(response)
 
   return {
     job,
