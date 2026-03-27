@@ -10,12 +10,30 @@ Build and run just the viewer from this directory:
 docker compose up --build
 ```
 
-By default it builds against `http://localhost:8000` and requests `demo-export`.
+By default it builds against `http://localhost:8000`, requests `demo-export`, and publishes the viewer on `http://localhost:3101`.
+
+If you run the Vite dev server directly, the default local port is also `3101`:
+
+```bash
+npm run dev
+```
 
 From the repo root:
 
 - `docker compose up --build` uses LocalStack API Gateway in front of the Lambda image
 - `docker compose -f compose.local.yml up --build` points the viewer at the direct Uvicorn backend
+
+If you need to avoid host port collisions on a shared machine, override the published port:
+
+```bash
+HORIZON_VIEWER_HOST_PORT=13101 docker compose up --build
+```
+
+The same applies to direct Vite runs:
+
+```bash
+npm run dev -- --port 13101
+```
 
 ## Admin Debug Panel
 

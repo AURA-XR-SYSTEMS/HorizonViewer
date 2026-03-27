@@ -14,4 +14,4 @@ services:
     container_name: horizon-viewer
     restart: unless-stopped
     ports:
-      - "3001:8080"
+      - "${HORIZON_VIEWER_HOST_PORT:-3101}:8080"
