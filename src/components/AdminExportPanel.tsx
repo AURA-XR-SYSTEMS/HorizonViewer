@@ -45,16 +45,16 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
   const canUpload = Boolean(job?.exportId && workspaceId.trim() && selectedFile) && !isSubmitting
   const canPoll = Boolean(job?.exportId && workspaceId.trim()) && !isSubmitting
 
-  const bootstrapLimitation = useMemo(() => {
+  const bootstrapStatus = useMemo(() => {
     if (job?.status !== 'ready') {
       return null
     }
 
     if (job.viewerUrl) {
-      return `Backend returned viewerUrl: ${job.viewerUrl}`
+      return `Viewer bootstrap is live. Open ${job.viewerUrl} to load this export in HorizonViewer.`
     }
 
-    return 'Job is ready, but HorizonViewer bootstrap is not wired to /api/viewer/bootstrap yet. This panel only verifies the export-job flow.'
+    return 'Job is ready. Open HorizonViewer with ?exportId=<exportId> to load /api/viewer/bootstrap.'
   }, [job])
 
   async function runRequest(action: () => Promise<void>) {
@@ -174,9 +174,9 @@ export default function AdminExportPanel({ defaultWorkspaceId = '' }: AdminExpor
             <dt className="text-white/48">Error</dt>
             <dd data-testid="job-error-message" className="break-words text-rose-200">{job?.errorMessage ?? 'none'}</dd>
           </dl>
-          {bootstrapLimitation ? (
-            <p data-testid="bootstrap-limitation" className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm leading-5 text-amber-100">
-              {bootstrapLimitation}
+          {bootstrapStatus ? (
+            <p data-testid="bootstrap-status" className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-sm leading-5 text-emerald-100">
+              {bootstrapStatus}
             </p>
           ) : null}
         </section>

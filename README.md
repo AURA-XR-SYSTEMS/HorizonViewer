@@ -30,6 +30,5 @@ This panel exercises the backend export-job endpoints:
 - `POST /api/exports/{workspaceId}/{exportId}/upload`
 - `GET /api/exports/{workspaceId}/{exportId}`
 
-It does not yet consume `GET /api/viewer/bootstrap?exportId=...`.
-When a job becomes `ready`, the panel stays honest about that limitation instead of inventing viewer bootstrap behavior.
-
+It now consumes `GET /api/viewer/bootstrap?exportId=...` for both seeded demo exports and real ready export jobs.
+When an export job becomes `ready`, the panel surfaces the returned `viewerUrl` so you can open the viewer directly against that export.

@@ -47,5 +47,15 @@ export const ExportConfigEnvelopeSchema = z.object({
   config: ApiProjectConfigSchema,
 })
 
+export const ViewerBootstrapResponseSchema = z.object({
+  exportId: z.string(),
+  workspaceId: z.string(),
+  status: z.enum(['created', 'processing', 'ready', 'failed']),
+  viewerUrl: z.string().nullable(),
+  metadata: z.unknown().nullable(),
+  config: ApiProjectConfigSchema,
+})
+
 export type ApiProjectConfig = z.infer<typeof ApiProjectConfigSchema>
 export type ExportConfigEnvelope = z.infer<typeof ExportConfigEnvelopeSchema>
+export type ViewerBootstrapResponse = z.infer<typeof ViewerBootstrapResponseSchema>
