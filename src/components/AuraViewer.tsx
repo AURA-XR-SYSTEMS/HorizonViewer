@@ -158,7 +158,11 @@ export default function AuraViewer({ config }: AuraViewerProps) {
           data-transition-play-attempted={String(debugState?.playAttempted ?? false)}
           data-transition-playing={String(debugState?.playing ?? false)}
           data-transition-advancing={String(debugState?.advancing ?? false)}
+          data-transition-completion-fired={String(debugState?.completionFired ?? false)}
+          data-transition-completion-signal={debugState?.completionSignal ?? ''}
+          data-transition-committed-view-id={String(debugState?.committedViewId ?? '')}
           data-transition-current-time={String(debugState?.currentTime ?? 0)}
+          data-transition-duration={String(debugState?.duration ?? '')}
           data-transition-error={debugState?.error ?? ''}
           data-transition-play-rejected={debugState?.playRejected ?? ''}
           data-transition-last-event={debugState?.lastEvent ?? ''}
@@ -220,6 +224,8 @@ export default function AuraViewer({ config }: AuraViewerProps) {
         >
           {JSON.stringify(
             {
+              currentViewId,
+              currentViewName: currentView?.name ?? null,
               activeTransitionKey,
               isTransitioning,
               showStaticImage,

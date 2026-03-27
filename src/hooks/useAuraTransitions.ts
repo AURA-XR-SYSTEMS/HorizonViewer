@@ -10,6 +10,7 @@ interface UseAuraTransitionsParams {
 export interface TransitionDebugState {
   key: string
   src: string
+  targetViewId: number | null
   loadedMetadata: boolean
   canPlay: boolean
   playRequested: boolean
@@ -17,7 +18,11 @@ export interface TransitionDebugState {
   playRejected: string | null
   playing: boolean
   advancing: boolean
+  completionFired: boolean
+  completionSignal: string | null
+  committedViewId: number | null
   currentTime: number
+  duration: number | null
   paused: boolean
   ended: boolean
   error: string | null
@@ -62,6 +67,7 @@ export function useAuraTransitions({
       const current = prev[key] ?? {
         key,
         src: video?.currentSrc || video?.src || '',
+        targetViewId: null,
         loadedMetadata: false,
         canPlay: false,
         playRequested: false,
@@ -69,7 +75,11 @@ export function useAuraTransitions({
         playRejected: null,
         playing: false,
         advancing: false,
+        completionFired: false,
+        completionSignal: null,
+        committedViewId: null,
         currentTime: 0,
+        duration: Number.isFinite(video?.duration) ? (video?.duration ?? null) : null,
         paused: video?.paused ?? true,
         ended: false,
         error: null,
@@ -82,6 +92,8 @@ export function useAuraTransitions({
           ...current,
           src: video?.currentSrc || video?.src || current.src,
           currentTime: video?.currentTime ?? current.currentTime,
+          duration:
+            video && Number.isFinite(video.duration) ? video.duration : current.duration,
           paused: video?.paused ?? current.paused,
           ...patch,
         },
@@ -163,6 +175,7 @@ export function useAuraTransitions({
         emitDebugLog(key, 'loadedmetadata', video)
         updateDebugState(key, video, {
           loadedMetadata: true,
+          duration: Number.isFinite(video.duration) ? video.duration : null,
           lastEvent: 'loadedmetadata',
         })
       }
@@ -207,6 +220,7 @@ export function useAuraTransitions({
       const handleTimeUpdate = () => {
         updateDebugState(key, video, {
           currentTime: video.currentTime,
+          duration: Number.isFinite(video.duration) ? video.duration : null,
           advancing: video.currentTime > 0,
           lastEvent: 'timeupdate',
         })
@@ -274,6 +288,20 @@ export function useAuraTransitions({
       transitionDebug
   }, [debugEnabled, transitionDebug])
 
+  useEffect(() => {
+    setTransitionDebug((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).map(([key, value]) => [
+          key,
+          {
+            ...value,
+            committedViewId: currentViewId,
+          },
+        ])
+      )
+    )
+  }, [currentViewId])
+
   const resetTransitionState = () => {
     setShowStaticImage(true)
     setIsTransitioning(false)
@@ -308,26 +336,64 @@ export function useAuraTransitions({
     setActiveTransitionKey(transitionKey)
     setIsTransitioning(true)
 
-    const cleanup = () => {
-      video.onended = null
+    let completionFinalized = false
+
+    const removeCompletionListeners = () => {
+      video.removeEventListener('ended', handleEnded)
+      video.removeEventListener('timeupdate', handleCompletionTimeUpdate)
+    }
+
+    const removeStartupListeners = () => {
       video.removeEventListener('seeked', handleSeeked)
     }
 
-    const handleEnded = () => {
-      cleanup()
-      emitDebugLog(transitionKey, 'transition-ended', video)
-      updateDebugState(transitionKey, video, { ended: true, lastEvent: 'transition-ended' })
+    const finalizeTransition = (signal: string) => {
+      if (completionFinalized) {
+        return
+      }
+      completionFinalized = true
+      removeStartupListeners()
+      removeCompletionListeners()
+      emitDebugLog(transitionKey, 'transition-complete', video, {
+        signal,
+        targetViewId,
+      })
+      updateDebugState(transitionKey, video, {
+        completionFired: true,
+        completionSignal: signal,
+        committedViewId: targetViewId,
+        ended: signal === 'ended' || video.ended,
+        lastEvent: 'transition-complete',
+      })
       onViewChange(targetViewId)
       resetTransitionState()
+    }
+
+    const handleEnded = () => {
+      finalizeTransition('ended')
+    }
+
+    const handleCompletionTimeUpdate = () => {
+      const duration = video.duration
+      if (!Number.isFinite(duration) || duration <= 0) {
+        return
+      }
+
+      if (video.currentTime >= duration - 0.05) {
+        finalizeTransition('timeupdate-near-end')
+      }
     }
 
     const startPlayback = () => {
       setShowStaticImage(false)
       updateDebugState(transitionKey, video, {
+        targetViewId,
         playRequested: true,
         playRejected: null,
         ended: false,
         advancing: false,
+        completionFired: false,
+        completionSignal: null,
         lastEvent: 'play-requested',
       })
       emitDebugLog(transitionKey, 'play-requested', video)
@@ -349,12 +415,13 @@ export function useAuraTransitions({
 
     const handleSeeked = () => {
       emitDebugLog(transitionKey, 'seeked', video)
-      cleanup()
+      removeStartupListeners()
       startPlayback()
     }
 
     video.pause()
-    video.onended = handleEnded
+    video.addEventListener('ended', handleEnded)
+    video.addEventListener('timeupdate', handleCompletionTimeUpdate)
     video.addEventListener('seeked', handleSeeked)
     video.defaultMuted = true
     video.muted = true
@@ -363,7 +430,7 @@ export function useAuraTransitions({
 
     // If the video is already at the beginning, some browsers will not emit `seeked`.
     if (Math.abs(video.currentTime) < 0.001) {
-      cleanup()
+      removeStartupListeners()
       startPlayback()
     }
   }

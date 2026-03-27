@@ -163,6 +163,7 @@ test('loads viewer config from the bootstrap endpoint when exportId is present',
 test('transition debug reports playback readiness and advancing currentTime', async ({ page }) => {
   await page.addInitScript(() => {
     const currentTimes = new WeakMap<HTMLMediaElement, number>()
+    const durations = new WeakMap<HTMLMediaElement, number>()
 
     Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
       configurable: true,
@@ -175,6 +176,13 @@ test('transition debug reports playback readiness and advancing currentTime', as
           this.dispatchEvent(new Event('seeked'))
           this.dispatchEvent(new Event('timeupdate'))
         })
+      },
+    })
+
+    Object.defineProperty(HTMLMediaElement.prototype, 'duration', {
+      configurable: true,
+      get() {
+        return durations.get(this) ?? 1
       },
     })
 
@@ -193,6 +201,7 @@ test('transition debug reports playback readiness and advancing currentTime', as
     })
 
     HTMLMediaElement.prototype.load = function () {
+      durations.set(this, 1)
       queueMicrotask(() => {
         this.dispatchEvent(new Event('loadedmetadata'))
         this.dispatchEvent(new Event('canplay'))
@@ -206,6 +215,11 @@ test('transition debug reports playback readiness and advancing currentTime', as
       queueMicrotask(() => {
         this.dispatchEvent(new Event('timeupdate'))
       })
+      window.setTimeout(() => {
+        currentTimes.set(this, 1)
+        this.dispatchEvent(new Event('timeupdate'))
+        this.dispatchEvent(new Event('ended'))
+      }, 20)
       return Promise.resolve()
     }
 
@@ -262,4 +276,13 @@ test('transition debug reports playback readiness and advancing currentTime', as
     'data-transition-advancing',
     'true'
   )
+  await expect(page.getByTestId('transition-container-1-2')).toHaveAttribute(
+    'data-transition-completion-fired',
+    'true'
+  )
+  await expect(page.getByTestId('transition-container-1-2')).toHaveAttribute(
+    'data-transition-committed-view-id',
+    '2'
+  )
+  await expect(page.getByText('Current view: Platform Level')).toBeVisible()
 })
