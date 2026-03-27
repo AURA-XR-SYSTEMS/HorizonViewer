@@ -38,6 +38,8 @@ export default function AuraViewer({ config }: AuraViewerProps) {
   const [carouselIndex, setCarouselIndex] = useState(0)
   const { containerRef, containerSize, windowWidth } = useViewerLayout()
   const {
+    debugEnabled,
+    transitionDebug,
     videoRefs,
     isTransitioning,
     activeTransitionKey,
@@ -126,16 +128,6 @@ export default function AuraViewer({ config }: AuraViewerProps) {
     }
   }
 
-  // preload transition videos
-  useEffect(() => {
-    transitions.forEach((t) => {
-      const video = videoRefs.current[t.key]
-      if (video) {
-        video.load()
-      }
-    })
-  }, [transitions])
-
   const isPanelOpen = (locationId: string) =>
     openPanels.some((panel) => panel.location.id === locationId)
 
@@ -147,20 +139,40 @@ export default function AuraViewer({ config }: AuraViewerProps) {
     )
   }
 
+  const transitionDebugEntries = transitions.map((transition) => ({
+    transition,
+    debugState: transitionDebug[transition.key],
+  }))
+
   return (
     <div className="bg-aura-black text-text-primary relative h-full w-full overflow-hidden">
-      {transitions.map((t) => (
+      {transitionDebugEntries.map(({ transition, debugState }) => (
         <div
-          key={t.key}
-          className={`absolute inset-0 ${activeTransitionKey === t.key ? 'z-10' : 'z-0'}`}
+          key={transition.key}
+          data-testid={`transition-container-${transition.key}`}
+          data-transition-key={transition.key}
+          data-transition-active={String(activeTransitionKey === transition.key)}
+          data-transition-loadedmetadata={String(debugState?.loadedMetadata ?? false)}
+          data-transition-canplay={String(debugState?.canPlay ?? false)}
+          data-transition-play-requested={String(debugState?.playRequested ?? false)}
+          data-transition-play-attempted={String(debugState?.playAttempted ?? false)}
+          data-transition-playing={String(debugState?.playing ?? false)}
+          data-transition-advancing={String(debugState?.advancing ?? false)}
+          data-transition-current-time={String(debugState?.currentTime ?? 0)}
+          data-transition-error={debugState?.error ?? ''}
+          data-transition-play-rejected={debugState?.playRejected ?? ''}
+          data-transition-last-event={debugState?.lastEvent ?? ''}
+          className={`absolute inset-0 ${activeTransitionKey === transition.key ? 'z-10' : 'z-0'}`}
         >
           <video
             ref={(el) => {
-              videoRefs.current[t.key] = el
+              videoRefs.current[transition.key] = el
             }}
-            src={t.videoUrl}
+            data-testid={`transition-video-${transition.key}`}
+            src={transition.videoUrl}
             className="h-full w-full object-cover"
             muted
+            defaultMuted
             playsInline
             preload="auto"
           />
@@ -200,6 +212,24 @@ export default function AuraViewer({ config }: AuraViewerProps) {
       <div className="rounded-pill bg-surface-overlay absolute top-4 left-4 z-50 px-3 py-2 text-sm">
         Current view: {currentView?.name ?? 'Unknown'}
       </div>
+
+      {debugEnabled ? (
+        <pre
+          data-testid="transition-debug-overlay"
+          className="absolute top-4 right-4 z-[60] max-w-[min(36rem,calc(100%-2rem))] overflow-auto rounded-xl border border-white/15 bg-black/70 px-3 py-2 text-[11px] leading-5 text-white/85 backdrop-blur"
+        >
+          {JSON.stringify(
+            {
+              activeTransitionKey,
+              isTransitioning,
+              showStaticImage,
+              transitions: transitionDebug,
+            },
+            null,
+            2
+          )}
+        </pre>
+      ) : null}
 
       <TimelineZone
         expanded={timelineExpanded}

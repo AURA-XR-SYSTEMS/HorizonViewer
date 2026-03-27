@@ -159,3 +159,107 @@ test('loads viewer config from the bootstrap endpoint when exportId is present',
 
   await expect(page.getByText('Current view: Station Plaza')).toBeVisible()
 })
+
+test('transition debug reports playback readiness and advancing currentTime', async ({ page }) => {
+  await page.addInitScript(() => {
+    const currentTimes = new WeakMap<HTMLMediaElement, number>()
+
+    Object.defineProperty(HTMLMediaElement.prototype, 'currentTime', {
+      configurable: true,
+      get() {
+        return currentTimes.get(this) ?? 0
+      },
+      set(value: number) {
+        currentTimes.set(this, value)
+        queueMicrotask(() => {
+          this.dispatchEvent(new Event('seeked'))
+          this.dispatchEvent(new Event('timeupdate'))
+        })
+      },
+    })
+
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get() {
+        return 4
+      },
+    })
+
+    Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
+      configurable: true,
+      get() {
+        return false
+      },
+    })
+
+    HTMLMediaElement.prototype.load = function () {
+      queueMicrotask(() => {
+        this.dispatchEvent(new Event('loadedmetadata'))
+        this.dispatchEvent(new Event('canplay'))
+      })
+    }
+
+    HTMLMediaElement.prototype.play = function () {
+      this.dispatchEvent(new Event('play'))
+      this.dispatchEvent(new Event('playing'))
+      currentTimes.set(this, 0.5)
+      queueMicrotask(() => {
+        this.dispatchEvent(new Event('timeupdate'))
+      })
+      return Promise.resolve()
+    }
+
+    HTMLMediaElement.prototype.pause = function () {}
+  })
+
+  await page.route(`${API_BASE}/api/viewer/bootstrap?exportId=export-123`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        exportId: 'export-123',
+        workspaceId: 'workspace-123',
+        status: 'ready',
+        viewerUrl: 'http://localhost:3101/?exportId=export-123',
+        metadata: null,
+        config: {
+          views: [
+            { id: 1, name: 'Station Plaza', imageUrl: 'http://127.0.0.1:9999/assets/view-1.png' },
+            { id: 2, name: 'Platform Level', imageUrl: 'http://127.0.0.1:9999/assets/view-2.png' },
+          ],
+          transitions: [
+            { key: '1-2', from: 1, to: 2, videoUrl: 'http://127.0.0.1:9999/assets/transition-1-2.mp4' },
+          ],
+          locations: [],
+        },
+      }),
+    })
+  })
+
+  await page.goto('/?exportId=export-123&transitionDebug=1')
+
+  await expect(page.getByText('Current view: Station Plaza')).toBeVisible()
+  await expect(page.getByTestId('transition-container-1-2')).toHaveAttribute(
+    'data-transition-loadedmetadata',
+    'true'
+  )
+  await expect(page.getByTestId('transition-container-1-2')).toHaveAttribute(
+    'data-transition-canplay',
+    'true'
+  )
+
+  await page.getByTestId('timeline-card-2').click()
+
+  await expect(page.getByTestId('transition-container-1-2')).toHaveAttribute(
+    'data-transition-play-requested',
+    'true'
+  )
+  await expect(page.getByTestId('transition-container-1-2')).toHaveAttribute(
+    'data-transition-playing',
+    'true'
+  )
+  await expect(page.getByTestId('transition-container-1-2')).toHaveAttribute(
+    'data-transition-advancing',
+    'true'
+  )
+})
