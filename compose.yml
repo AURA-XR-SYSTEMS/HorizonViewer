@@ -9,6 +9,8 @@ services:
         VITE_HORIZON_API_BASE_URL: ${VITE_HORIZON_API_BASE_URL:-http://localhost:8000}
         VITE_HORIZON_CONFIG_URL: ${VITE_HORIZON_CONFIG_URL:-}
         VITE_HORIZON_EXPORT_ID: ${VITE_HORIZON_EXPORT_ID:-demo-export}
+        VITE_HORIZON_ENABLE_ADMIN_PANEL: ${VITE_HORIZON_ENABLE_ADMIN_PANEL:-false}
+        VITE_HORIZON_ADMIN_DEFAULT_WORKSPACE_ID: ${VITE_HORIZON_ADMIN_DEFAULT_WORKSPACE_ID:-}
     container_name: horizon-viewer
     restart: unless-stopped
     ports:
