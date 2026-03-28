@@ -20,7 +20,11 @@ function ViewerSurface() {
   }
 
   if (error) {
-    return <div className="viewer-shell-message viewer-shell-error">Failed to load viewer: {error}</div>
+    return (
+      <div className="viewer-shell-message viewer-shell-error">
+        Failed to load viewer: {error}
+      </div>
+    )
   }
 
   if (!config) {
@@ -33,7 +37,8 @@ function ViewerSurface() {
 function ViewerIdleState() {
   return (
     <div className="viewer-shell-message viewer-shell-muted">
-      Admin panel is enabled. No viewer export is currently configured in the URL or build env.
+      Admin panel is enabled. No viewer export is currently configured in the URL or build
+      env.
     </div>
   )
 }
@@ -46,7 +51,9 @@ export default function App() {
   return (
     <div className="relative h-full w-full">
       {shouldRenderViewer ? <ViewerSurface /> : <ViewerIdleState />}
-      {adminPanelEnabled ? <AdminExportPanel defaultWorkspaceId={defaultWorkspaceId} /> : null}
+      {adminPanelEnabled ? (
+        <AdminExportPanel defaultWorkspaceId={defaultWorkspaceId} />
+      ) : null}
     </div>
   )
 }

@@ -13,6 +13,7 @@ Instructions in this file apply to the entire repository.
 
 Run checks on every implementation pass before responding.
 
+- Formatting check: `npm run format:check`
 - Preferred frontend validation: `npm run build`
 - End-to-end validation: `npm run test:e2e -- <spec>`
 
@@ -22,3 +23,4 @@ Run checks on every implementation pass before responding.
 - If you need to avoid host port collisions on a shared machine, override the Docker host port with `HORIZON_VIEWER_HOST_PORT` instead of editing `compose.yml`.
 - You can override the Vite port ad hoc with `npm run dev -- --port <port>`.
 - The Playwright harness intentionally uses its own isolated port (`4174`) instead of the default dev port.
+- Local GitHub Actions runs use `act pull_request -W .github/workflows/ci.yml --container-architecture linux/amd64`.

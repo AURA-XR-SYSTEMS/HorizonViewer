@@ -16,4 +16,4 @@ services:
       - ./.env
     restart: unless-stopped
     ports:
-      - "${HORIZON_VIEWER_HOST_PORT:-3101}:8080"
+      - '${HORIZON_VIEWER_HOST_PORT:-3101}:8080'

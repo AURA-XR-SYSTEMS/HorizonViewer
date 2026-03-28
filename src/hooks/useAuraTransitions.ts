@@ -53,7 +53,9 @@ export function useAuraTransitions({
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [activeTransitionKey, setActiveTransitionKey] = useState<string | null>(null)
   const [showStaticImage, setShowStaticImage] = useState(true)
-  const [transitionDebug, setTransitionDebug] = useState<Record<string, TransitionDebugState>>({})
+  const [transitionDebug, setTransitionDebug] = useState<
+    Record<string, TransitionDebugState>
+  >({})
 
   const debugEnabled = isTransitionDebugEnabled()
 
@@ -62,7 +64,11 @@ export function useAuraTransitions({
     [transitions]
   )
 
-  const updateDebugState = (key: string, video: HTMLVideoElement | null, patch: Partial<TransitionDebugState>) => {
+  const updateDebugState = (
+    key: string,
+    video: HTMLVideoElement | null,
+    patch: Partial<TransitionDebugState>
+  ) => {
     setTransitionDebug((prev) => {
       const current = prev[key] ?? {
         key,
@@ -101,7 +107,12 @@ export function useAuraTransitions({
     })
   }
 
-  const emitDebugLog = (key: string, event: string, video: HTMLVideoElement | null, extra: Record<string, unknown> = {}) => {
+  const emitDebugLog = (
+    key: string,
+    event: string,
+    video: HTMLVideoElement | null,
+    extra: Record<string, unknown> = {}
+  ) => {
     if (!debugEnabled) {
       return
     }
@@ -284,8 +295,11 @@ export function useAuraTransitions({
       return
     }
 
-    ;(window as Window & { __AURA_TRANSITION_DEBUG__?: Record<string, TransitionDebugState> }).__AURA_TRANSITION_DEBUG__ =
-      transitionDebug
+    ;(
+      window as Window & {
+        __AURA_TRANSITION_DEBUG__?: Record<string, TransitionDebugState>
+      }
+    ).__AURA_TRANSITION_DEBUG__ = transitionDebug
   }, [debugEnabled, transitionDebug])
 
   useEffect(() => {

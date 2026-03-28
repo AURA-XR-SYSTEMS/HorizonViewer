@@ -28,11 +28,15 @@ test('renders the admin panel on page load', async ({ page }) => {
   await expect(page.getByTestId('admin-panel')).toBeVisible()
   await expect(page.getByText('Export Job Workflow')).toBeVisible()
   await expect(
-    page.getByText('Admin panel is enabled. No viewer export is currently configured in the URL or build env.')
+    page.getByText(
+      'Admin panel is enabled. No viewer export is currently configured in the URL or build env.'
+    )
   ).toBeVisible()
 })
 
-test('creates an export job, uploads a zip, and renders ready-state details', async ({ page }) => {
+test('creates an export job, uploads a zip, and renders ready-state details', async ({
+  page,
+}) => {
   await page.route(`${API_BASE}/api/exports/workspace-123/new`, async (route) => {
     expect(route.request().method()).toBe('POST')
     await route.fulfill({
@@ -42,23 +46,26 @@ test('creates an export job, uploads a zip, and renders ready-state details', as
     })
   })
 
-  await page.route(`${API_BASE}/api/exports/workspace-123/export-123/upload`, async (route) => {
-    expect(route.request().method()).toBe('POST')
-    const contentType = await route.request().headerValue('content-type')
-    expect(contentType).toContain('multipart/form-data')
+  await page.route(
+    `${API_BASE}/api/exports/workspace-123/export-123/upload`,
+    async (route) => {
+      expect(route.request().method()).toBe('POST')
+      const contentType = await route.request().headerValue('content-type')
+      expect(contentType).toContain('multipart/form-data')
 
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(
-        jobPayload({
-          status: 'ready',
-          viewerUrl: 'http://localhost:3101/?exportId=export-123',
-          updatedAt: '2026-03-25T18:01:00Z',
-        })
-      ),
-    })
-  })
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          jobPayload({
+            status: 'ready',
+            viewerUrl: 'http://localhost:3101/?exportId=export-123',
+            updatedAt: '2026-03-25T18:01:00Z',
+          })
+        ),
+      })
+    }
+  )
 
   await page.goto('/')
 
@@ -68,9 +75,13 @@ test('creates an export job, uploads a zip, and renders ready-state details', as
   await expect(page.getByTestId('job-export-id')).toContainText('export-123')
   await expect(page.getByTestId('job-status')).toContainText('created')
   await expect(page.getByTestId('job-error-message')).toContainText('none')
-  await expect(page.getByTestId('last-request-panel')).toContainText('/api/exports/workspace-123/new')
+  await expect(page.getByTestId('last-request-panel')).toContainText(
+    '/api/exports/workspace-123/new'
+  )
   await expect(page.getByTestId('last-response-payload')).toContainText('export-123')
-  await expect(page.getByTestId('last-response-payload')).not.toContainText('errorMessage')
+  await expect(page.getByTestId('last-response-payload')).not.toContainText(
+    'errorMessage'
+  )
 
   await page.getByTestId('upload-file-input').setInputFiles({
     name: 'export.zip',
@@ -80,10 +91,16 @@ test('creates an export job, uploads a zip, and renders ready-state details', as
   await page.getByTestId('upload-button').click()
 
   await expect(page.getByTestId('job-status')).toContainText('ready')
-  await expect(page.getByTestId('last-request-panel')).toContainText('/api/exports/workspace-123/export-123/upload')
+  await expect(page.getByTestId('last-request-panel')).toContainText(
+    '/api/exports/workspace-123/export-123/upload'
+  )
   await expect(page.getByTestId('last-request-panel')).toContainText('file=export.zip')
-  await expect(page.getByTestId('bootstrap-status')).toContainText('Viewer bootstrap is live')
-  await expect(page.getByTestId('bootstrap-status')).toContainText('http://localhost:3101/?exportId=export-123')
+  await expect(page.getByTestId('bootstrap-status')).toContainText(
+    'Viewer bootstrap is live'
+  )
+  await expect(page.getByTestId('bootstrap-status')).toContainText(
+    'http://localhost:3101/?exportId=export-123'
+  )
 })
 
 test('polls status and renders backend errors', async ({ page }) => {
@@ -116,8 +133,12 @@ test('polls status and renders backend errors', async ({ page }) => {
   await page.getByTestId('poll-button').click()
 
   await expect(page.getByTestId('job-status')).toContainText('failed')
-  await expect(page.getByTestId('job-error-message')).toContainText('Upload processing failed')
-  await expect(page.getByTestId('last-request-panel')).toContainText('/api/exports/workspace-123/export-123')
+  await expect(page.getByTestId('job-error-message')).toContainText(
+    'Upload processing failed'
+  )
+  await expect(page.getByTestId('last-request-panel')).toContainText(
+    '/api/exports/workspace-123/export-123'
+  )
 
   await page.unroute(`${API_BASE}/api/exports/workspace-123/new`)
   await page.route(`${API_BASE}/api/exports/workspace-error/new`, async (route) => {
@@ -131,36 +152,58 @@ test('polls status and renders backend errors', async ({ page }) => {
   await page.getByTestId('workspace-input').fill('workspace-error')
   await page.getByTestId('create-job-button').click()
 
-  await expect(page.getByTestId('last-error-panel')).toContainText('Export service unavailable')
+  await expect(page.getByTestId('last-error-panel')).toContainText(
+    'Export service unavailable'
+  )
 })
 
-test('loads viewer config from the bootstrap endpoint when exportId is present', async ({ page }) => {
-  await page.route(`${API_BASE}/api/viewer/bootstrap?exportId=export-123`, async (route) => {
-    expect(route.request().method()).toBe('GET')
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        exportId: 'export-123',
-        workspaceId: 'workspace-123',
-        status: 'ready',
-        viewerUrl: 'http://localhost:3101/?exportId=export-123',
-        metadata: null,
-        config: {
-          views: [{ id: 1, name: 'Station Plaza', imageUrl: 'http://127.0.0.1:9999/assets/view-1.png' }],
-          transitions: [{ key: '1-1', from: 1, to: 1, videoUrl: 'http://127.0.0.1:9999/assets/loop.mp4' }],
-          locations: [],
-        },
-      }),
-    })
-  })
+test('loads viewer config from the bootstrap endpoint when exportId is present', async ({
+  page,
+}) => {
+  await page.route(
+    `${API_BASE}/api/viewer/bootstrap?exportId=export-123`,
+    async (route) => {
+      expect(route.request().method()).toBe('GET')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          exportId: 'export-123',
+          workspaceId: 'workspace-123',
+          status: 'ready',
+          viewerUrl: 'http://localhost:3101/?exportId=export-123',
+          metadata: null,
+          config: {
+            views: [
+              {
+                id: 1,
+                name: 'Station Plaza',
+                imageUrl: 'http://127.0.0.1:9999/assets/view-1.png',
+              },
+            ],
+            transitions: [
+              {
+                key: '1-1',
+                from: 1,
+                to: 1,
+                videoUrl: 'http://127.0.0.1:9999/assets/loop.mp4',
+              },
+            ],
+            locations: [],
+          },
+        }),
+      })
+    }
+  )
 
   await page.goto('/?exportId=export-123')
 
   await expect(page.getByText('Current view: Station Plaza')).toBeVisible()
 })
 
-test('transition debug reports playback readiness and advancing currentTime', async ({ page }) => {
+test('transition debug reports playback readiness and advancing currentTime', async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     const currentTimes = new WeakMap<HTMLMediaElement, number>()
     const durations = new WeakMap<HTMLMediaElement, number>()
@@ -226,29 +269,45 @@ test('transition debug reports playback readiness and advancing currentTime', as
     HTMLMediaElement.prototype.pause = function () {}
   })
 
-  await page.route(`${API_BASE}/api/viewer/bootstrap?exportId=export-123`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        exportId: 'export-123',
-        workspaceId: 'workspace-123',
-        status: 'ready',
-        viewerUrl: 'http://localhost:3101/?exportId=export-123',
-        metadata: null,
-        config: {
-          views: [
-            { id: 1, name: 'Station Plaza', imageUrl: 'http://127.0.0.1:9999/assets/view-1.png' },
-            { id: 2, name: 'Platform Level', imageUrl: 'http://127.0.0.1:9999/assets/view-2.png' },
-          ],
-          transitions: [
-            { key: '1-2', from: 1, to: 2, videoUrl: 'http://127.0.0.1:9999/assets/transition-1-2.mp4' },
-          ],
-          locations: [],
-        },
-      }),
-    })
-  })
+  await page.route(
+    `${API_BASE}/api/viewer/bootstrap?exportId=export-123`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          exportId: 'export-123',
+          workspaceId: 'workspace-123',
+          status: 'ready',
+          viewerUrl: 'http://localhost:3101/?exportId=export-123',
+          metadata: null,
+          config: {
+            views: [
+              {
+                id: 1,
+                name: 'Station Plaza',
+                imageUrl: 'http://127.0.0.1:9999/assets/view-1.png',
+              },
+              {
+                id: 2,
+                name: 'Platform Level',
+                imageUrl: 'http://127.0.0.1:9999/assets/view-2.png',
+              },
+            ],
+            transitions: [
+              {
+                key: '1-2',
+                from: 1,
+                to: 2,
+                videoUrl: 'http://127.0.0.1:9999/assets/transition-1-2.mp4',
+              },
+            ],
+            locations: [],
+          },
+        }),
+      })
+    }
+  )
 
   await page.goto('/?exportId=export-123&transitionDebug=1')
 

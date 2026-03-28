@@ -50,3 +50,25 @@ This panel exercises the backend export-job endpoints:
 
 It now consumes `GET /api/viewer/bootstrap?exportId=...` for both seeded demo exports and real ready export jobs.
 When an export job becomes `ready`, the panel surfaces the returned `viewerUrl` so you can open the viewer directly against that export.
+
+## Validation
+
+Run the local viewer checks with:
+
+```bash
+npm run format:check
+npm run build
+```
+
+For browser tests:
+
+```bash
+npm run test:e2e:install
+npm run test:e2e
+```
+
+To run the GitHub Actions workflow locally with `act`:
+
+```bash
+act pull_request -W .github/workflows/ci.yml --container-architecture linux/amd64
+```
