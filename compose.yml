@@ -12,6 +12,8 @@ services:
         VITE_HORIZON_ENABLE_ADMIN_PANEL: ${VITE_HORIZON_ENABLE_ADMIN_PANEL:-false}
         VITE_HORIZON_ADMIN_DEFAULT_WORKSPACE_ID: ${VITE_HORIZON_ADMIN_DEFAULT_WORKSPACE_ID:-}
     container_name: horizon-viewer
+    env_file:
+      - ./.env
     restart: unless-stopped
     ports:
-      - "3001:8080"
+      - '${HORIZON_VIEWER_HOST_PORT:-3101}:8080'

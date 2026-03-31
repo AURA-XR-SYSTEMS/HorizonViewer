@@ -26,6 +26,7 @@ export default function TimelineCard({
     <button
       key={view.id}
       type="button"
+      data-testid={`timeline-card-${view.id}`}
       onClick={() => onClick(view.id)}
       className={`relative shrink-0 overflow-hidden transition-all duration-300 ${
         expanded

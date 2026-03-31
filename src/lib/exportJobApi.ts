@@ -73,7 +73,9 @@ async function expectCreateJobResponse(
   }
 }
 
-async function expectJobResponse(response: Response): Promise<DebugResponse & { job: ExportJobResponse }> {
+async function expectJobResponse(
+  response: Response
+): Promise<DebugResponse & { job: ExportJobResponse }> {
   const payload = await parseResponse(response)
 
   if (!response.ok) {
