@@ -12,7 +12,7 @@ Instructions in this file apply to the entire repository.
   - update local `main` from `origin/main`
   - create a new branch named `codex/<short-slug>`
   - do not make feature or bugfix commits on `main`
-- After the requested work is complete and the relevant validation passes, stage the intended files, commit them, and push the branch to `origin`.
+- After the requested work is complete and the relevant validation passes, stage the intended files, commit them, push the branch to `origin`, and open a pull request against `main`.
 
 ## Validation
 
