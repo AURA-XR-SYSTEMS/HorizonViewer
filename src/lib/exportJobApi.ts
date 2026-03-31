@@ -22,6 +22,34 @@ export interface ExportJobApiResult {
   debugResponse: DebugResponse
 }
 
+export interface UploadMetadataLocation {
+  id: string
+  name: string
+  viewPositions: Array<{
+    viewId: number
+    x: number
+    y: number
+  }>
+}
+
+export interface UploadMetadataPayload {
+  projectName?: string
+  sourceApplication?: string
+  sourceVersion?: string
+  views: Array<{
+    id: number
+    name: string
+    imagePath: string
+  }>
+  transitions: Array<{
+    key: string
+    fromViewId: number
+    toViewId: number
+    videoPath: string
+  }>
+  locations: UploadMetadataLocation[]
+}
+
 function getApiBaseUrl(): string {
   const apiBaseUrl = import.meta.env.VITE_HORIZON_API_BASE_URL
   if (!apiBaseUrl) {
@@ -120,18 +148,24 @@ export async function createExportJob(workspaceId: string): Promise<ExportJobApi
 export async function uploadExportZip(
   workspaceId: string,
   exportId: string,
-  file: File
+  file: File,
+  metadata?: UploadMetadataPayload
 ): Promise<ExportJobApiResult> {
   const url = `${getApiBaseUrl()}/api/exports/${encodeURIComponent(workspaceId)}/${encodeURIComponent(
     exportId
   )}/upload`
   const formData = new FormData()
   formData.append('file', file)
+  if (metadata) {
+    formData.append('metadata', JSON.stringify(metadata))
+  }
 
   const debugRequest: DebugRequest = {
     method: 'POST',
     url,
-    summary: `multipart/form-data with file=${file.name} (${file.type || 'unknown type'}, ${file.size} bytes)`,
+    summary: metadata
+      ? `multipart/form-data with file=${file.name} (${file.type || 'unknown type'}, ${file.size} bytes) and metadata JSON`
+      : `multipart/form-data with file=${file.name} (${file.type || 'unknown type'}, ${file.size} bytes)`,
   }
 
   const response = await fetch(url, {

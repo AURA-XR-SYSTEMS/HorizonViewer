@@ -52,6 +52,16 @@ test('creates an export job, uploads a zip, and renders ready-state details', as
       expect(route.request().method()).toBe('POST')
       const contentType = await route.request().headerValue('content-type')
       expect(contentType).toContain('multipart/form-data')
+      const payload = route.request().postDataBuffer()
+      expect(payload).not.toBeNull()
+      const body = payload?.toString('utf-8') ?? ''
+      expect(body).toContain('name="file"')
+      expect(body).toContain('filename="export.zip"')
+      expect(body).toContain('name="metadata"')
+      expect(body).toContain('"projectName":"Admin Debug Export"')
+      expect(body).toContain('"sourceApplication":"HorizonViewer Admin Panel"')
+      expect(body).toContain('"imagePath":"assets/view_1.png"')
+      expect(body).toContain('"videoPath":"assets/transition_1_2.mp4"')
 
       await route.fulfill({
         status: 200,
@@ -95,6 +105,7 @@ test('creates an export job, uploads a zip, and renders ready-state details', as
     '/api/exports/workspace-123/export-123/upload'
   )
   await expect(page.getByTestId('last-request-panel')).toContainText('file=export.zip')
+  await expect(page.getByTestId('last-request-panel')).toContainText('metadata JSON')
   await expect(page.getByTestId('bootstrap-status')).toContainText(
     'Viewer bootstrap is live'
   )
