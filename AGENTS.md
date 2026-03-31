@@ -8,6 +8,8 @@ Instructions in this file apply to the entire repository.
 - Keep changes minimal and localized to the requested behavior.
 - Do not revert user changes you did not make.
 - Use `apply_patch` for manual file edits.
+- Before starting new work, check whether the current branch has an associated pull request and whether it is already merged.
+- If the current branch's PR is merged, switch to `main`, pull the latest `origin/main`, and create a fresh `codex/<short-slug>` branch before making changes.
 - Start implementation work from the latest `main`:
   - update local `main` from `origin/main`
   - create a new branch named `codex/<short-slug>`
