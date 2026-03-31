@@ -8,6 +8,11 @@ Instructions in this file apply to the entire repository.
 - Keep changes minimal and localized to the requested behavior.
 - Do not revert user changes you did not make.
 - Use `apply_patch` for manual file edits.
+- Start implementation work from the latest `main`:
+  - update local `main` from `origin/main`
+  - create a new branch named `codex/<short-slug>`
+  - do not make feature or bugfix commits on `main`
+- After the requested work is complete and the relevant validation passes, stage the intended files, commit them, push the branch to `origin`, and open a pull request against `main`.
 
 ## Validation
 
