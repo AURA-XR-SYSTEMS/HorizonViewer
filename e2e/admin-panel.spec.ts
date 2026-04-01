@@ -60,8 +60,11 @@ test('creates an export job, uploads a zip, and renders ready-state details', as
       expect(body).toContain('name="metadata"')
       expect(body).toContain('"projectName":"Admin Debug Export"')
       expect(body).toContain('"sourceApplication":"HorizonViewer Admin Panel"')
-      expect(body).toContain('"imagePath":"assets/view_1.png"')
-      expect(body).toContain('"videoPath":"assets/transition_1_2.mp4"')
+      expect(body).toContain('"id":"station-plaza"')
+      expect(body).toContain('"filename":"assets/view_1.png"')
+      expect(body).toContain('"from":"station-plaza"')
+      expect(body).toContain('"to":"platform-level"')
+      expect(body).toContain('"filename":"assets/transition_1_2.mp4"')
 
       await route.fulfill({
         status: 200,
