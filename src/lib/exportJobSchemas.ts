@@ -15,6 +15,7 @@ export const CreateExportJobResponseSchema = ExportJobBaseSchema
 
 export const ExportJobResponseSchema = ExportJobBaseSchema.extend({
   errorMessage: z.string().nullable(),
+  warningMessage: z.string().nullable().optional(),
 })
 
 export type CreateExportJobResponse = z.infer<typeof CreateExportJobResponseSchema>
