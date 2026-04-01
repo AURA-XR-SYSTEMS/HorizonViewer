@@ -22,6 +22,8 @@ export interface ExportJobApiResult {
   debugResponse: DebugResponse
 }
 
+export type UploadMetadataFormat = 'horizon' | 'unreal'
+
 export interface UploadMetadataLocation {
   id: string
   name: string
@@ -99,6 +101,7 @@ function jobResponseFromCreateResponse(job: CreateExportJobResponse): ExportJobR
   return {
     ...job,
     errorMessage: null,
+    warningMessage: null,
   }
 }
 
@@ -176,7 +179,8 @@ export async function uploadExportZip(
   workspaceId: string,
   exportId: string,
   file: File,
-  metadata?: UploadRequestMetadata
+  metadata?: UploadRequestMetadata,
+  format?: UploadMetadataFormat
 ): Promise<ExportJobApiResult> {
   const url = `${getApiBaseUrl()}/api/exports/${encodeURIComponent(workspaceId)}/${encodeURIComponent(
     exportId
@@ -186,12 +190,15 @@ export async function uploadExportZip(
   if (metadata) {
     formData.append('metadata', JSON.stringify(metadata))
   }
+  if (format) {
+    formData.append('format', format)
+  }
 
   const debugRequest: DebugRequest = {
     method: 'POST',
     url,
     summary: metadata
-      ? `multipart/form-data with file=${file.name} (${file.type || 'unknown type'}, ${file.size} bytes) and metadata JSON`
+      ? `multipart/form-data with file=${file.name} (${file.type || 'unknown type'}, ${file.size} bytes) and metadata JSON${format ? ` and format=${format}` : ''}`
       : `multipart/form-data with file=${file.name} (${file.type || 'unknown type'}, ${file.size} bytes)`,
   }
 

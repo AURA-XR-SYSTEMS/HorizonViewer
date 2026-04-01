@@ -237,6 +237,10 @@ export default function AdminExportPanel({
             <dd data-testid="job-error-message" className="break-words text-rose-200">
               {job?.errorMessage ?? 'none'}
             </dd>
+            <dt className="text-white/48">Warning</dt>
+            <dd data-testid="job-warning-message" className="break-words text-amber-200">
+              {job?.warningMessage ?? 'none'}
+            </dd>
           </dl>
           {bootstrapStatus ? (
             <p

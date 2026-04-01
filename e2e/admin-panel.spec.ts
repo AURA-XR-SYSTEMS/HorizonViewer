@@ -18,6 +18,7 @@ function jobPayload(overrides: Record<string, unknown> = {}) {
   return {
     ...createJobPayload(),
     errorMessage: null,
+    warningMessage: null,
     ...overrides,
   }
 }
@@ -73,6 +74,8 @@ test('creates an export job, uploads a zip, and renders ready-state details', as
           jobPayload({
             status: 'ready',
             viewerUrl: 'http://localhost:3101/?exportId=export-123',
+            warningMessage:
+              'Metadata format was auto-detected as Unreal legacy. Please include format=unreal in future /upload requests.',
             updatedAt: '2026-03-25T18:01:00Z',
           })
         ),
@@ -109,6 +112,9 @@ test('creates an export job, uploads a zip, and renders ready-state details', as
   )
   await expect(page.getByTestId('last-request-panel')).toContainText('file=export.zip')
   await expect(page.getByTestId('last-request-panel')).toContainText('metadata JSON')
+  await expect(page.getByTestId('job-warning-message')).toContainText(
+    'Metadata format was auto-detected as Unreal legacy'
+  )
   await expect(page.getByTestId('bootstrap-status')).toContainText(
     'Viewer bootstrap is live'
   )
