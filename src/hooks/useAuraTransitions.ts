@@ -337,6 +337,8 @@ export function useAuraTransitions({
       return
     }
 
+    onViewChange(targetViewId)
+
     const video = videoRefs.current[transitionKey]
     if (!video) {
       emitDebugLog(transitionKey, 'missing-transition-video-ref', null, {
@@ -379,7 +381,6 @@ export function useAuraTransitions({
         ended: signal === 'ended' || video.ended,
         lastEvent: 'transition-complete',
       })
-      onViewChange(targetViewId)
       resetTransitionState()
     }
 
@@ -422,7 +423,6 @@ export function useAuraTransitions({
           playing: false,
           lastEvent: 'play-rejected',
         })
-        onViewChange(targetViewId)
         resetTransitionState()
       })
     }
