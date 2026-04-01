@@ -282,7 +282,7 @@ test('transition debug reports playback readiness and advancing currentTime', as
         currentTimes.set(this, 1)
         this.dispatchEvent(new Event('timeupdate'))
         this.dispatchEvent(new Event('ended'))
-      }, 20)
+      }, 250)
       return Promise.resolve()
     }
 
@@ -347,6 +347,7 @@ test('transition debug reports playback readiness and advancing currentTime', as
     'data-transition-play-requested',
     'true'
   )
+  await expect(page.getByText('Current view: Platform Level')).toBeVisible()
   await expect(page.getByTestId('transition-container-1-2')).toHaveAttribute(
     'data-transition-playing',
     'true'
