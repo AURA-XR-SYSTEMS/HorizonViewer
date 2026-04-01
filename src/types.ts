@@ -2,6 +2,7 @@ export interface ViewNode {
   id: number;
   name: string;
   imageUrl: string;
+  alternateLayers?: { name: string; imageUrl: string }[];
 }
 
 export interface Transition {

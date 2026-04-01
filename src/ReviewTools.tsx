@@ -102,7 +102,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
   };
 
   // Undo stack
-  const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
+  const [, setUndoStack] = useState<UndoEntry[]>([]);
 
   // Interaction refs
   const isDrawing = useRef(false);

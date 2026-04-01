@@ -19,17 +19,6 @@ const ChevronRight = () => (
   </svg>
 );
 
-const ChevronDown = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m6 9 6 6 6-6"/>
-  </svg>
-);
-
-const ChevronUp = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m18 15-6-6-6 6"/>
-  </svg>
-);
 
 const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
   const { views, transitions, locations } = config;
@@ -44,6 +33,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 1920, height: 1080 });
   const [openPanels, setOpenPanels] = useState<{ location: AuraLocation; left: string; top: string }[]>([]);
+  const [altLayerIndex, setAltLayerIndex] = useState<Record<number, number>>({}); // viewId -> 0 (base) or 1+ (alternate)
 
   // Video cache
   const videoCache = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -136,6 +126,86 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
     return { left: `${pixelX}px`, top: `${pixelY}px`, visible };
   };
 
+  const [videoExpanded, setVideoExpanded] = useState(false);
+  const ytPlayerRef = useRef<any>(null);
+  const ytContainerRef = useRef<HTMLDivElement>(null);
+  const ytDragRef = useRef<{ isDragging: boolean; lastX: number; lastY: number; startX: number; startY: number; didDrag: boolean }>({ isDragging: false, lastX: 0, lastY: 0, startX: 0, startY: 0, didDrag: false });
+
+  // Load YouTube IFrame API once
+  useEffect(() => {
+    if ((window as any).YT) return;
+    const tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.body.appendChild(tag);
+  }, []);
+
+  // Create/destroy YT player when Station 1 view is active
+  useEffect(() => {
+    if (currentViewId !== 2 || isTransitioning) {
+      // Destroy player when leaving view
+      if (ytPlayerRef.current) {
+        ytPlayerRef.current.destroy();
+        ytPlayerRef.current = null;
+      }
+      return;
+    }
+
+    const createPlayer = () => {
+      if (!ytContainerRef.current || ytPlayerRef.current) return;
+      ytPlayerRef.current = new (window as any).YT.Player(ytContainerRef.current, {
+        videoId: 'm894UVinb2M',
+        playerVars: { enablejsapi: 1, playsinline: 1, rel: 0 },
+      });
+    };
+
+    if ((window as any).YT && (window as any).YT.Player) {
+      createPlayer();
+    } else {
+      (window as any).onYouTubeIframeAPIReady = createPlayer;
+    }
+  }, [currentViewId, isTransitioning]);
+
+  // 360 drag handler
+  const handleYtMouseDown = useCallback((e: React.MouseEvent) => {
+    ytDragRef.current = { isDragging: true, lastX: e.clientX, lastY: e.clientY, startX: e.clientX, startY: e.clientY, didDrag: false };
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const d = ytDragRef.current;
+      if (!d.isDragging || !ytPlayerRef.current) return;
+      const deltaX = e.clientX - d.lastX;
+      const deltaY = e.clientY - d.lastY;
+      d.lastX = e.clientX;
+      d.lastY = e.clientY;
+      if (Math.abs(e.clientX - d.startX) > 5 || Math.abs(e.clientY - d.startY) > 5) d.didDrag = true;
+      try {
+        const props = ytPlayerRef.current.getSphericalProperties();
+        if (props && typeof props.yaw === 'number') {
+          ytPlayerRef.current.setSphericalProperties({
+            yaw: props.yaw + deltaX * 0.3,
+            pitch: Math.max(-90, Math.min(90, props.pitch + deltaY * 0.3)),
+            roll: props.roll,
+            fov: props.fov,
+          });
+        }
+      } catch (_) {}
+    };
+    const onUp = () => { ytDragRef.current.isDragging = false; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, []);
+
+  const handleYtClick = useCallback((e: React.MouseEvent) => {
+    // Only toggle play/pause on short clicks (not drags)
+    if (!ytPlayerRef.current) return;
+    const state = ytPlayerRef.current.getPlayerState();
+    if (state === 1) { ytPlayerRef.current.pauseVideo(); }
+    else { ytPlayerRef.current.playVideo(); }
+  }, []);
+
   const currentView = views.find(n => n.id === currentViewId);
 
   useEffect(() => {
@@ -166,6 +236,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
       setActiveTransitionKey(transitionKey);
       setIsTransitioning(true);
 
+      setVideoExpanded(false);
       video.onended = () => {
         // Video finished — pause on last frame (it stays visible in DOM).
         // Swap the still behind it, wait for the image to load, then remove the video.
@@ -252,7 +323,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
   return (
     <div className="relative w-full h-full bg-black overflow-hidden">
 
-      {/* Layer 0: Static View Image */}
+      {/* Layer 0: Static View Image (base) */}
       <div
         ref={containerRef}
         className="absolute inset-0 z-0"
@@ -262,6 +333,26 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
           backgroundPosition: 'center',
         }}
       />
+
+      {/* Layer 0b: Alternate layer (fades in/out on top of base) */}
+      {currentView?.alternateLayers && currentView.alternateLayers.length > 0 && (
+        currentView.alternateLayers.map((alt, i) => {
+          const activeAlt = (altLayerIndex[currentViewId] || 0) - 1; // -1 = base, 0 = first alt, etc.
+          return (
+            <div
+              key={`alt-${currentViewId}-${i}`}
+              className="absolute inset-0 z-[1]"
+              style={{
+                backgroundImage: `url(${alt.imageUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                opacity: activeAlt === i ? 1 : 0,
+                transition: 'opacity 600ms ease-in-out',
+              }}
+            />
+          );
+        })
+      )}
 
       {/* Layer 1: Location Pins (behind video) */}
       <div className="absolute inset-0 z-[5]">
@@ -376,6 +467,82 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
         </div>
       ))}
 
+      {/* YouTube 360 embed for Station 1 view */}
+      {currentViewId === 2 && !isTransitioning && (
+        <>
+          {/* Backdrop when expanded */}
+          {videoExpanded && (
+            <div
+              className="absolute inset-0"
+              style={{ zIndex: 20000, background: 'rgba(0,0,0,0.6)', cursor: 'pointer' }}
+              onClick={() => setVideoExpanded(false)}
+            />
+          )}
+          <div
+            className="absolute"
+            style={{
+              zIndex: videoExpanded ? 20001 : 9,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: videoExpanded ? '75vw' : '25vw',
+              aspectRatio: '16 / 9',
+              borderRadius: videoExpanded ? 8 : 12,
+              overflow: 'hidden',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              transition: 'width 400ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 400ms ease',
+            }}
+          >
+            {/* YT Player container */}
+            <div ref={ytContainerRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+
+            {/* Drag overlay for 360 control (expanded) / click-to-expand (collapsed) */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                bottom: videoExpanded ? 50 : 0,
+                zIndex: 1,
+                cursor: videoExpanded ? 'grab' : 'pointer',
+              }}
+              onMouseDown={(e) => {
+                if (!videoExpanded) return;
+                handleYtMouseDown(e);
+              }}
+              onClick={() => {
+                if (!videoExpanded) {
+                  setVideoExpanded(true);
+                } else if (!ytDragRef.current.didDrag) {
+                  handleYtClick({} as React.MouseEvent);
+                }
+              }}
+            >
+              {/* Play button when collapsed */}
+              {!videoExpanded && (
+                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.15)' }}>
+                  <div
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: '50%',
+                      background: 'rgba(0,0,0,0.55)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Layer 2: Review Tools canvas overlay (behind video) */}
       <ReviewTools
         expanded={toolbarExpanded}
@@ -461,7 +628,16 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
                   return (
                     <button
                       key={node.id}
-                      onClick={() => handleTransition(node.id)}
+                      onClick={() => {
+                        if (node.id === currentViewId && node.alternateLayers && node.alternateLayers.length > 0) {
+                          // Cycle through: base -> alt1 -> alt2 -> ... -> base
+                          const totalLayers = node.alternateLayers.length + 1;
+                          const current = altLayerIndex[node.id] || 0;
+                          setAltLayerIndex(prev => ({ ...prev, [node.id]: (current + 1) % totalLayers }));
+                        } else {
+                          handleTransition(node.id);
+                        }
+                      }}
                       disabled={isTransitioning}
                       className={`
                         relative overflow-hidden flex-shrink-0
@@ -515,6 +691,23 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
                       >
                         {node.name}
                       </span>
+                      {/* Layer indicator dots */}
+                      {timelineExpanded && node.alternateLayers && node.alternateLayers.length > 0 && isActive && (
+                        <div className="absolute top-2 right-2 flex gap-1" style={{ opacity: timelineExpanded ? 1 : 0, transition: 'opacity 300ms ease-out' }}>
+                          {[0, ...node.alternateLayers.map((_, i) => i + 1)].map(layerIdx => (
+                            <div
+                              key={layerIdx}
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                background: (altLayerIndex[node.id] || 0) === layerIdx ? 'white' : 'rgba(255,255,255,0.4)',
+                                transition: 'background 300ms ease',
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </button>
                   );
                 })}

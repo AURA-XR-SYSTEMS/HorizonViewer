@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>360 Video Embed Test</title>
+  <style>
+    body { margin: 0; background: #111; display: flex; align-items: center; justify-content: center; height: 100vh; }
+    #container { position: relative; width: 960px; height: 540px; }
+    #player { width: 100%; height: 100%; }
+    #drag-overlay {
+      position: absolute;
+      inset: 0;
+      cursor: grab;
+      z-index: 1;
+    }
+    #drag-overlay.dragging { cursor: grabbing; }
+    #controls { position: absolute; bottom: 0; left: 0; right: 0; height: 50px; z-index: 2; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #fff;
+      font: 14px monospace;
+      background: rgba(0,0,0,0.6);
+      padding: 8px 12px;
+      border-radius: 6px;
+      z-index: 3;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="player"></div>
+    <!-- Transparent overlay captures drag, passes clicks through for play/pause -->
+    <div id="drag-overlay"></div>
+    <!-- Gap at bottom so YouTube controls are clickable -->
+    <div id="controls"></div>
+    <div id="info">Loading player...</div>
+  </div>
+
+  <script>
+    // Load YouTube IFrame API
+    var tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.body.appendChild(tag);
+
+    var player;
+    var info = document.getElementById('info');
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        videoId: 'm894UVinb2M',
+        playerVars: {
+          enablejsapi: 1,
+          playsinline: 1,
+          rel: 0,
+        },
+        events: {
+          onReady: onPlayerReady,
+        },
+      });
+    }
+
+    function onPlayerReady(event) {
+      info.textContent = 'Ready — drag to look around';
+      setupDragControls();
+    }
+
+    function setupDragControls() {
+      var overlay = document.getElementById('drag-overlay');
+      var isDragging = false;
+      var lastX, lastY;
+
+      overlay.addEventListener('mousedown', function(e) {
+        // Let double-click pass through for fullscreen
+        if (e.detail > 1) return;
+        isDragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        overlay.classList.add('dragging');
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+        var deltaX = e.clientX - lastX;
+        var deltaY = e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+
+        try {
+          var props = player.getSphericalProperties();
+          if (props && typeof props.yaw === 'number') {
+            player.setSphericalProperties({
+              yaw: props.yaw + deltaX * 0.3,
+              pitch: Math.max(-90, Math.min(90, props.pitch + deltaY * 0.3)),
+              roll: props.roll,
+              fov: props.fov,
+            });
+            info.textContent = 'yaw: ' + props.yaw.toFixed(1) + '  pitch: ' + props.pitch.toFixed(1) + '  fov: ' + props.fov.toFixed(1);
+          } else {
+            info.textContent = 'getSphericalProperties returned: ' + JSON.stringify(props);
+          }
+        } catch (err) {
+          info.textContent = 'Error: ' + err.message;
+        }
+      });
+
+      window.addEventListener('mouseup', function() {
+        isDragging = false;
+        overlay.classList.remove('dragging');
+      });
+
+      // Click pass-through: short clicks toggle play/pause
+      var mouseDownTime = 0;
+      overlay.addEventListener('mousedown', function() { mouseDownTime = Date.now(); });
+      overlay.addEventListener('mouseup', function(e) {
+        if (Date.now() - mouseDownTime < 200) {
+          // Short click — toggle play/pause
+          var state = player.getPlayerState();
+          if (state === YT.PlayerState.PLAYING) {
+            player.pauseVideo();
+          } else {
+            player.playVideo();
+          }
+        }
+      });
+
+      // Bottom 50px is reserved for YouTube controls — let clicks pass through
+      document.getElementById('controls').style.pointerEvents = 'none';
+      // Actually remove overlay from bottom area
+      overlay.style.bottom = '50px';
+    }
+  </script>
+</body>
+</html>

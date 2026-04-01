@@ -5,3 +5,7 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+
+# Large binary assets (managed separately)
+public/assets/projects/
+public/assets/horizon/

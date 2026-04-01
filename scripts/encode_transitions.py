@@ -2,12 +2,13 @@
 Encode HORIZON VideoCaptures -> H.264 MP4 videos + static view images + config JSON.
 
 Usage:
-    python scripts/encode_transitions.py --use-mp4              # Copy existing MP4s (fast)
-    python scripts/encode_transitions.py --resolution 1920x1080 # Re-encode from frames
+    python scripts/encode_transitions.py --use-mp4                          # Default project
+    python scripts/encode_transitions.py --use-mp4 --project maui-busway   # Named project
+    python scripts/encode_transitions.py --use-mp4 --source "D:\\renders"   # Custom source
 
 Output structure:
-    public/assets/horizon/
-        views/          Static JPG per view (first frame of any outgoing transition)
+    public/assets/projects/{project-slug}/
+        views/          Static JPG per view
         transitions/    MP4 per transition folder
         config.json     ProjectConfig for the viewer
 """
@@ -23,9 +24,9 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Paths
-SOURCE_DIR = Path(r"C:\Perforce\AURA_DEV_WORKSPACE\AURA_MAUI\Saved\VideoCaptures")
+DEFAULT_SOURCE_DIR = Path(r"C:\Perforce\AURA_DEV_WORKSPACE\AURA_MAUI\Saved\VideoCaptures")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = PROJECT_ROOT / "public" / "assets" / "horizon"
+PROJECTS_DIR = PROJECT_ROOT / "public" / "assets" / "projects"
 
 def slugify(name: str) -> str:
     """Convert view name to URL-safe slug."""
@@ -143,13 +144,13 @@ def encode_transition(t: dict, resolution: str, crf: int, fps: int, output_dir: 
     size_mb = out_path.stat().st_size / (1024 * 1024)
     return {"file": filename, "size_mb": size_mb, "status": "ok"}
 
-def extract_view_image_from_mp4(view_name: str, transitions: list, output_dir: Path) -> str | None:
+def extract_view_image_from_mp4(view_name: str, transitions: list, output_dir: Path, project_slug: str) -> str | None:
     """Extract last frame from an incoming transition as the static view image (Cesium fully loaded)."""
     slug = slugify(view_name)
     out_path = output_dir / "views" / f"{slug}.jpg"
 
     if out_path.exists():
-        return f"/assets/horizon/views/{slug}.jpg"
+        return f"/assets/projects/{project_slug}/views/{slug}.jpg"
 
     # Use last frame of a transition TO this view (arrival = fully loaded)
     for t in transitions:
@@ -168,7 +169,7 @@ def extract_view_image_from_mp4(view_name: str, transitions: list, output_dir: P
                     ]
                     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                     if result.returncode == 0:
-                        return f"/assets/horizon/views/{slug}.jpg"
+                        return f"/assets/projects/{project_slug}/views/{slug}.jpg"
 
             # Fallback: last frame from MP4
             cmd = [
@@ -181,16 +182,16 @@ def extract_view_image_from_mp4(view_name: str, transitions: list, output_dir: P
             ]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             if result.returncode == 0:
-                return f"/assets/horizon/views/{slug}.jpg"
+                return f"/assets/projects/{project_slug}/views/{slug}.jpg"
     return None
 
-def extract_view_image_from_frames(view_name: str, transitions: list, resolution: str, output_dir: Path) -> str | None:
+def extract_view_image_from_frames(view_name: str, transitions: list, resolution: str, output_dir: Path, project_slug: str) -> str | None:
     """Extract first frame from PNG sequence as the static view image."""
     slug = slugify(view_name)
     out_path = output_dir / "views" / f"{slug}.jpg"
 
     if out_path.exists():
-        return f"/assets/horizon/views/{slug}.jpg"
+        return f"/assets/projects/{project_slug}/views/{slug}.jpg"
 
     for t in transitions:
         if t["from_name"] == view_name:
@@ -206,10 +207,10 @@ def extract_view_image_from_frames(view_name: str, transitions: list, resolution
                 ]
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                 if result.returncode == 0:
-                    return f"/assets/horizon/views/{slug}.jpg"
+                    return f"/assets/projects/{project_slug}/views/{slug}.jpg"
     return None
 
-def generate_config(views: list, transitions: list, view_images: dict) -> dict:
+def generate_config(views: list, transitions: list, view_images: dict, project_slug: str, project_name: str) -> dict:
     """Generate ProjectConfig JSON."""
     view_nodes = []
     view_id_map = {}
@@ -231,35 +232,72 @@ def generate_config(views: list, transitions: list, view_images: dict) -> dict:
         transition_list.append({
             "from": from_id,
             "to": to_id,
-            "videoUrl": f"/assets/horizon/transitions/{from_slug}_to_{to_slug}.mp4",
+            "videoUrl": f"/assets/projects/{project_slug}/transitions/{from_slug}_to_{to_slug}.mp4",
             "key": key,
         })
 
     return {
-        "projectId": "horizon-metro",
-        "projectName": "HORIZON - Metro Digital Twin",
+        "projectId": project_slug,
+        "projectName": project_name,
         "views": view_nodes,
         "transitions": transition_list,
         "locations": [],
         "metadata": {
-            "description": f"LA Metro HORIZON project - {len(views)} views with full transition coverage",
+            "description": f"{project_name} - {len(views)} views with full transition coverage",
             "viewCount": len(views),
             "transitionCount": len(transitions),
         },
     }
 
+def update_project_index(projects_dir: Path):
+    """Scan projects dir and write index.json + active-project.json."""
+    projects = []
+    for entry in sorted(projects_dir.iterdir()):
+        config_path = entry / "config.json"
+        if entry.is_dir() and config_path.exists():
+            with open(config_path) as f:
+                cfg = json.load(f)
+            projects.append({
+                "id": cfg.get("projectId", entry.name),
+                "name": cfg.get("projectName", entry.name),
+            })
+
+    # Write index
+    index_path = projects_dir / "index.json"
+    with open(index_path, "w") as f:
+        json.dump(projects, f, indent=2)
+    print(f"  Updated {index_path} ({len(projects)} projects)")
+
+    # Write active-project.json if it doesn't exist (default to first)
+    active_path = projects_dir.parent / "active-project.json"
+    if not active_path.exists() and projects:
+        with open(active_path, "w") as f:
+            json.dump({"activeProject": projects[0]["id"]}, f, indent=2)
+        print(f"  Created {active_path} -> {projects[0]['id']}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Encode HORIZON transitions")
+    parser.add_argument("--project", required=True, help="Project slug (e.g. maui-busway)")
+    parser.add_argument("--name", default=None, help="Project display name (defaults to slug)")
+    parser.add_argument("--source", default=None, help="Source directory (default: Perforce VideoCaptures)")
     parser.add_argument("--resolution", default="1920x1080", help="Output resolution (default: 1920x1080)")
     parser.add_argument("--crf", type=int, default=26, help="H.264 CRF quality (default: 26, lower=better)")
     parser.add_argument("--fps", type=int, default=30, help="Frame rate (default: 30)")
     parser.add_argument("--workers", type=int, default=4, help="Parallel encoding threads (default: 4)")
     parser.add_argument("--use-mp4", action="store_true", help="Copy existing MP4s instead of re-encoding from frames")
+    parser.add_argument("--set-active", action="store_true", help="Set this project as the active (demo) project")
     args = parser.parse_args()
 
+    source_dir = Path(args.source) if args.source else DEFAULT_SOURCE_DIR
+    project_slug = args.project
+    project_name = args.name or project_slug.replace("-", " ").title()
+    OUTPUT_DIR = PROJECTS_DIR / project_slug
+
     print(f"=== HORIZON Transition Encoder ===")
-    print(f"Source: {SOURCE_DIR}")
-    print(f"Output: {OUTPUT_DIR}")
+    print(f"Project: {project_slug} ({project_name})")
+    print(f"Source:  {source_dir}")
+    print(f"Output:  {OUTPUT_DIR}")
     if args.use_mp4:
         print(f"Mode: Copy existing MP4s (native resolution)")
     else:
@@ -273,7 +311,7 @@ def main():
 
     # Discover
     print("Discovering views and transitions...")
-    views, transitions = discover_views_and_transitions(SOURCE_DIR, use_mp4=args.use_mp4)
+    views, transitions = discover_views_and_transitions(source_dir, use_mp4=args.use_mp4)
     print(f"  Found {len(views)} views, {len(transitions)} transitions")
     print(f"  Views: {', '.join(views)}")
     print()
@@ -283,9 +321,9 @@ def main():
     view_images = {}
     for name in views:
         if args.use_mp4:
-            url = extract_view_image_from_mp4(name, transitions, OUTPUT_DIR)
+            url = extract_view_image_from_mp4(name, transitions, OUTPUT_DIR, project_slug)
         else:
-            url = extract_view_image_from_frames(name, transitions, args.resolution, OUTPUT_DIR)
+            url = extract_view_image_from_frames(name, transitions, args.resolution, OUTPUT_DIR, project_slug)
         if url:
             view_images[name] = url
             print(f"  [OK] {name}")
@@ -340,11 +378,24 @@ def main():
     print(f"  Avg per video: {total_size/max(len(ok_results),1):.1f} MB")
 
     # Generate config
-    config = generate_config(views, transitions, view_images)
+    config = generate_config(views, transitions, view_images, project_slug, project_name)
     config_path = OUTPUT_DIR / "config.json"
     with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
     print(f"  Config: {config_path}")
+
+    # Update project index
+    print()
+    print("Updating project index...")
+    update_project_index(PROJECTS_DIR)
+
+    # Set as active project if requested
+    if args.set_active:
+        active_path = PROJECTS_DIR.parent / "active-project.json"
+        with open(active_path, "w") as f:
+            json.dump({"activeProject": project_slug}, f, indent=2)
+        print(f"  Active project set to: {project_slug}")
+
     print()
     print("Done!")
 
