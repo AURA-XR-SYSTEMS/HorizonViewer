@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -34,9 +38,17 @@ jobs:
         run: |
           {
             echo "image_name=$REGISTRY_HOST/$IMAGE_REPOSITORY"
-            echo "sha_image=$REGISTRY_HOST/$IMAGE_REPOSITORY:$GITHUB_SHA"
+            echo "sha_image=$REGISTRY_HOST/$IMAGE_REPOSITORY:sha-$GITHUB_SHA"
             echo "mainline_image=$REGISTRY_HOST/$IMAGE_REPOSITORY:$MAINLINE_TAG"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Show publish details
+        run: |
+          echo "registry_host=$REGISTRY_HOST"
+          echo "image_repository=$IMAGE_REPOSITORY"
+          echo "commit_sha=$GITHUB_SHA"
+          echo "sha_image=${{ steps.image.outputs.sha_image }}"
+          echo "mainline_image=${{ steps.image.outputs.mainline_image }}"
 
       - name: Log in to registry
         uses: docker/login-action@v3
