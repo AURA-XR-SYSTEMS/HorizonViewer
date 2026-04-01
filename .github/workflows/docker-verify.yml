@@ -1,0 +1,32 @@
+name: Docker Verify
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  docker-verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and start viewer
+        run: docker compose up -d --build
+
+      - name: Smoke check root document
+        run: curl --fail --retry 20 --retry-delay 2 http://127.0.0.1:3101/
+
+      - name: Smoke check static asset
+        run: curl --fail --retry 20 --retry-delay 2 http://127.0.0.1:3101/favicon.svg
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop viewer stack
+        if: always()
+        run: docker compose down -v
