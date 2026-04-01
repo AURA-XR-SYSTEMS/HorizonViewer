@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 import {
   createExportJob,
   fetchExportJob,
-  type UploadMetadataPayload,
+  type UnrealUploadMetadataPayload,
   uploadExportZip,
   type DebugRequest,
   type DebugResponse,
@@ -32,35 +32,33 @@ function prettyPrint(value: unknown): string {
   }
 }
 
-function buildDemoUploadMetadata(): UploadMetadataPayload {
+function buildDemoUploadMetadata(): UnrealUploadMetadataPayload {
   return {
     projectName: 'Admin Debug Export',
     sourceApplication: 'HorizonViewer Admin Panel',
     sourceVersion: 'debug',
     views: [
       {
-        id: 1,
+        id: 'station-plaza',
         name: 'Station Plaza',
-        imagePath: 'assets/view_1.png',
+        filename: 'assets/view_1.png',
       },
       {
-        id: 2,
+        id: 'platform-level',
         name: 'Platform Level',
-        imagePath: 'assets/view_2.png',
+        filename: 'assets/view_2.png',
       },
     ],
     transitions: [
       {
-        key: '1-2',
-        fromViewId: 1,
-        toViewId: 2,
-        videoPath: 'assets/transition_1_2.mp4',
+        from: 'station-plaza',
+        to: 'platform-level',
+        filename: 'assets/transition_1_2.mp4',
       },
       {
-        key: '2-1',
-        fromViewId: 2,
-        toViewId: 1,
-        videoPath: 'assets/transition_2_1.mp4',
+        from: 'platform-level',
+        to: 'station-plaza',
+        filename: 'assets/transition_2_1.mp4',
       },
     ],
     locations: [
@@ -68,8 +66,8 @@ function buildDemoUploadMetadata(): UploadMetadataPayload {
         id: 'loc-1',
         name: 'Main Control Center',
         viewPositions: [
-          { viewId: 1, x: 25, y: 40 },
-          { viewId: 2, x: 60, y: 35 },
+          { viewId: 'station-plaza', x: 25, y: 40 },
+          { viewId: 'platform-level', x: 60, y: 35 },
         ],
       },
     ],
@@ -265,8 +263,8 @@ export default function AdminExportPanel({
           />
           <p className="text-xs text-white/55">
             Uploads send <code>multipart/form-data</code> with both the zip{' '}
-            <code>file</code> and a debug <code>metadata</code> JSON payload that matches
-            the current HorizonServer contract.
+            <code>file</code> and a debug <code>metadata</code> JSON payload that mirrors
+            the current Unreal export payload shape.
           </p>
           <button
             data-testid="upload-button"

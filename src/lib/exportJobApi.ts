@@ -50,6 +50,33 @@ export interface UploadMetadataPayload {
   locations: UploadMetadataLocation[]
 }
 
+export interface UnrealUploadMetadataPayload {
+  projectName?: string
+  sourceApplication?: string
+  sourceVersion?: string
+  views: Array<{
+    id: string
+    name: string
+    filename: string
+  }>
+  transitions: Array<{
+    from: string
+    to: string
+    filename: string
+  }>
+  locations: Array<{
+    id: string
+    name: string
+    viewPositions?: Array<{
+      viewId: string
+      x: number
+      y: number
+    }>
+  }>
+}
+
+export type UploadRequestMetadata = UploadMetadataPayload | UnrealUploadMetadataPayload
+
 function getApiBaseUrl(): string {
   const apiBaseUrl = import.meta.env.VITE_HORIZON_API_BASE_URL
   if (!apiBaseUrl) {
@@ -149,7 +176,7 @@ export async function uploadExportZip(
   workspaceId: string,
   exportId: string,
   file: File,
-  metadata?: UploadMetadataPayload
+  metadata?: UploadRequestMetadata
 ): Promise<ExportJobApiResult> {
   const url = `${getApiBaseUrl()}/api/exports/${encodeURIComponent(workspaceId)}/${encodeURIComponent(
     exportId
