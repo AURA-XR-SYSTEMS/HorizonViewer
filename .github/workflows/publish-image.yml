@@ -15,7 +15,7 @@ permissions:
   packages: write
 
 env:
-  REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
+  REGISTRY_HOST: ${{ vars.REGISTRY_HOST }}
   IMAGE_REPOSITORY: ${{ vars.IMAGE_REPOSITORY }}
   MAINLINE_TAG: edge
 
@@ -29,7 +29,7 @@ jobs:
 
       - name: Validate registry configuration
         run: |
-          test -n "$REGISTRY_HOST" || { echo 'Missing REGISTRY_HOST secret'; exit 1; }
+          test -n "$REGISTRY_HOST" || { echo 'Missing REGISTRY_HOST variable'; exit 1; }
           test -n "$IMAGE_REPOSITORY" || { echo 'Missing IMAGE_REPOSITORY variable'; exit 1; }
 
       - name: Compute image references
