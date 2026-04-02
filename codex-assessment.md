@@ -2,9 +2,9 @@
 
 ## Current Classification
 
-- codexification stage: `standardized`
-- next stage target: `operational`
-- operational readiness: `partial`
+- codexification stage: `operational`
+- next stage target: `maintained`
+- operational readiness: `passing`
 
 ## Assessment Checks
 
@@ -18,7 +18,7 @@
 - `shared_skill_coverage`: `pass`
 - `repo_local_skill_coverage`: `deferred`
 - `publish_flow_current`: `pass`
-- `operational_smoke`: `partial`
+- `operational_smoke`: `pass`
 
 ## Latest Evidence
 
@@ -39,8 +39,16 @@
   - Playwright e2e
 - `2026-04-02`: `npm run format:check` passed.
 - `2026-04-02`: `npm run build` passed.
+- `2026-04-02`: explicit Codex workflow smoke passed using the documented toolkit order:
+  - read `codex-template.json` to identify stage, version, and next target
+  - read `codex-assessment.md` to confirm the promotion gate
+  - read `runtime-bootstrap.md` to confirm runtime and `gh` auth expectations
+  - use the shared `env-github-auth` logic via `gh auth status`
+  - read `verification-first.md` and `command-inventory.md` to choose the narrowest meaningful frontend validation path
+  - run `npm run format:check` and `npm run build` without ambiguity
+- The smoke pass shows a fresh agent can enter the repo, follow the CodexEnv surfaces, and execute the expected local verification path without needing repo-local skills.
 
 ## Next Promotion Gate
 
-- Stay at `standardized` until a recorded Codex workflow smoke pass proves a fresh agent can enter the repo, read the codex surfaces, choose the right frontend verification path, and execute it without ambiguity.
-- Consider repo-local skills only after deciding whether the current npm command surface needs a dedicated skill layer.
+- Stay at `operational` while the current frontend verification path and GitHub Actions coverage remain passing.
+- Promote to `maintained` after a later CodexEnv review confirms the repo stays current across template upgrades and the current shared-skill-only workflow remains sufficient.
