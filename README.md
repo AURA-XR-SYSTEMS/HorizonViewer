@@ -2,6 +2,16 @@
 
 A thin, embeddable viewer for artifacts built from the AURA platform.
 
+## Codex Status
+
+`single-repo@1.8.0` • Stage: `standardized` • Readiness: `partial` • Next: `operational`
+
+`discovered > scaffolded > [standardized] > operational > maintained`
+
+Remaining work: record a Codex workflow smoke pass that proves a fresh agent can read the codex surfaces, select the documented frontend verification path, and run it without ambiguity.
+
+Toolkit: shared foundation skills plus documented frontend validation and publish commands are available now. See `codex-assessment.md`, `skill-inventory.md`, and `command-inventory.md` for detail.
+
 ## Docker
 
 Build and run just the viewer from this directory:

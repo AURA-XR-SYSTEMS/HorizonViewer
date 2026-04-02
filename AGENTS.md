@@ -4,6 +4,10 @@ Instructions in this file apply to the entire repository.
 
 ## Workflow
 
+- Read `codex-template.json` first to determine the repo's template version and local override state.
+- Read `codex-assessment.md` after the manifest to understand current readiness evidence and promotion gates.
+- Read `runtime-bootstrap.md` first to determine the repo's runtime and auth conventions.
+- Read `skill-inventory.md` after the runtime docs to discover the current first-class skill surface.
 - Inspect the relevant code paths before editing. Prefer `rg` for search.
 - Keep changes minimal and localized to the requested behavior.
 - Do not revert user changes you did not make.
@@ -31,3 +35,6 @@ Run checks on every implementation pass before responding.
 - You can override the Vite port ad hoc with `npm run dev -- --port <port>`.
 - The Playwright harness intentionally uses its own isolated port (`4174`) instead of the default dev port.
 - Local GitHub Actions runs use `act pull_request -W .github/workflows/ci.yml --container-architecture linux/amd64`.
+- Treat [command-inventory.md](/home/codex/workspace/AURA/HorizonViewer/command-inventory.md) as the source list for future repo-local skills.
+- Treat [skill-inventory.md](/home/codex/workspace/AURA/HorizonViewer/skill-inventory.md) as the current map of first-class shared skills and deferred repo-local skill candidates.
+- Keep [codex-template.json](/home/codex/workspace/AURA/HorizonViewer/codex-template.json) updated when the repo is brought forward to a newer template version or when overrides change materially.
