@@ -26,13 +26,60 @@ function jobPayload(overrides: Record<string, unknown> = {}) {
 test('renders the admin panel on page load', async ({ page }) => {
   await page.goto('/')
 
-  await expect(page.getByTestId('admin-panel')).toBeVisible()
-  await expect(page.getByText('Export Job Workflow')).toBeVisible()
+  await expect(page.getByTestId('coming-soon-page')).toBeVisible()
+  await expect(page.getByText('Coming soon')).toBeVisible()
   await expect(
     page.getByText(
-      'Admin panel is enabled. No viewer export is currently configured in the URL or build env.'
+      'Future Unreal Engine exporter instructions and documentation will live here.'
     )
   ).toBeVisible()
+  await expect(page.getByTestId('admin-panel')).toBeVisible()
+  await expect(page.getByText('Export Job Workflow')).toBeVisible()
+})
+
+test('root with exportId enters the viewer flow instead of the landing page', async ({
+  page,
+}) => {
+  await page.route(
+    `${API_BASE}/api/viewer/bootstrap?exportId=test-export`,
+    async (route) => {
+      expect(route.request().method()).toBe('GET')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          exportId: 'test-export',
+          workspaceId: 'workspace-123',
+          status: 'ready',
+          viewerUrl: 'http://localhost:3101/?exportId=test-export',
+          metadata: null,
+          config: {
+            views: [
+              {
+                id: 1,
+                name: 'Test View',
+                imageUrl: 'http://127.0.0.1:9999/assets/view-1.png',
+              },
+            ],
+            transitions: [
+              {
+                key: '1-1',
+                from: 1,
+                to: 1,
+                videoUrl: 'http://127.0.0.1:9999/assets/loop.mp4',
+              },
+            ],
+            locations: [],
+          },
+        }),
+      })
+    }
+  )
+
+  await page.goto('/?exportId=test-export')
+
+  await expect(page.getByTestId('coming-soon-page')).not.toBeVisible()
+  await expect(page.getByText('Current view: Test View')).toBeVisible()
 })
 
 test('creates an export job, uploads a zip, and renders ready-state details', async ({
