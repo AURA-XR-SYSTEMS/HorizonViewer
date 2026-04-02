@@ -20,7 +20,7 @@ npm run dev
 
 From the repo root:
 
-- `docker compose up --build` uses LocalStack API Gateway in front of the Lambda image
+- `docker compose up --build` runs the Horizon backend as a normal API container on `http://localhost:9000`
 - `docker compose -f compose.local.yml up --build` points the viewer at the direct Uvicorn backend
 
 If you need to avoid host port collisions on a shared machine, override the published port:
