@@ -72,3 +72,15 @@ To run the GitHub Actions workflow locally with `act`:
 ```bash
 act pull_request -W .github/workflows/ci.yml --container-architecture linux/amd64
 ```
+
+## GitHub Pages
+
+The repo now includes a GitHub Pages deployment workflow at [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
+It deploys the built `dist/` output from `main` and sets the Vite asset base path automatically for a project site such as `/HorizonViewer/`.
+
+After merging, enable Pages in the repository settings:
+
+- GitHub: `Settings` -> `Pages`
+- Source: `GitHub Actions`
+
+If you later attach a custom domain or move this app to a user/organization site, update the Pages build base path by setting `VITE_BASE_PATH=/` in the workflow instead of the repository-name path.
