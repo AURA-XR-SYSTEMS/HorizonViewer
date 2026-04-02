@@ -1,4 +1,5 @@
 import AuraViewer from '@components/AuraViewer'
+import ComingSoonLanding from '@components/ComingSoonLanding'
 import AdminExportPanel from '@components/AdminExportPanel'
 import { useProjectConfig } from '@hooks/useProjectConfig'
 
@@ -7,9 +8,9 @@ function isAdminPanelEnabled(): boolean {
   return value === '1' || value === 'true' || value === 'yes'
 }
 
-function hasConfiguredExportId(): boolean {
+function hasViewerExportIdInUrl(): boolean {
   const params = new URLSearchParams(window.location.search)
-  return Boolean(params.get('exportId') ?? import.meta.env.VITE_HORIZON_EXPORT_ID)
+  return Boolean(params.get('exportId')?.trim())
 }
 
 function ViewerSurface() {
@@ -34,23 +35,14 @@ function ViewerSurface() {
   return <AuraViewer config={config} />
 }
 
-function ViewerIdleState() {
-  return (
-    <div className="viewer-shell-message viewer-shell-muted">
-      Admin panel is enabled. No viewer export is currently configured in the URL or build
-      env.
-    </div>
-  )
-}
-
 export default function App() {
   const adminPanelEnabled = isAdminPanelEnabled()
-  const shouldRenderViewer = !adminPanelEnabled || hasConfiguredExportId()
+  const shouldRenderViewer = hasViewerExportIdInUrl()
   const defaultWorkspaceId = import.meta.env.VITE_HORIZON_ADMIN_DEFAULT_WORKSPACE_ID ?? ''
 
   return (
     <div className="relative h-full w-full">
-      {shouldRenderViewer ? <ViewerSurface /> : <ViewerIdleState />}
+      {shouldRenderViewer ? <ViewerSurface /> : <ComingSoonLanding />}
       {adminPanelEnabled ? (
         <AdminExportPanel defaultWorkspaceId={defaultWorkspaceId} />
       ) : null}
