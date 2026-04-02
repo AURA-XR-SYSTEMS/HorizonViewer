@@ -1,15 +1,15 @@
 {
   "template_type": "single-repo",
   "template_version": "1.8.0",
-  "codexification_stage": "standardized",
+  "codexification_stage": "operational",
   "conformity_status": "conforming",
   "template_source": "CodexEnv/templates/single-repo",
   "template_access_mode": "local-checkout",
   "template_access_reference": "/home/codex/workspace/CodexEnv",
   "runtime_contract_version": "1.0.0",
   "shared_skill_set_version": "1.1.0",
-  "next_stage_target": "operational",
-  "operational_readiness": "partial",
+  "next_stage_target": "maintained",
+  "operational_readiness": "passing",
   "assessment_checks": {
     "readme_status_surface": "pass",
     "manifest_current": "pass",
@@ -21,7 +21,7 @@
     "shared_skill_coverage": "pass",
     "repo_local_skill_coverage": "deferred",
     "publish_flow_current": "pass",
-    "operational_smoke": "partial"
+    "operational_smoke": "pass"
   },
   "applied_at": "2026-04-02",
   "last_reviewed_at": "2026-04-02",
@@ -32,5 +32,5 @@
     "Repo-local skills are currently deferred because the documented npm command surface is small and stable.",
     "The repo publishes as a static frontend and does not participate in container publication."
   ],
-  "notes": "HorizonViewer is standardized on the single-repo@1.8.0 CodexEnv line with a grounded frontend verification path and GitHub Actions enforcement, but repo-local skills are still deferred."
+  "notes": "HorizonViewer is operational on the single-repo@1.8.0 CodexEnv line with a grounded frontend verification path, GitHub Actions enforcement, and a recorded Codex workflow smoke pass using the shared skill surface."
 }
