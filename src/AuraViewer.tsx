@@ -1,11 +1,21 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ProjectConfig, AuraLocation } from './types';
+import { ProjectConfig, AuraLocation, ViewNode } from './types';
 import AuraPin from './AuraPin';
 import ReviewTools from './ReviewTools';
 
 interface AuraViewerProps {
   config: ProjectConfig;
 }
+
+const MAX_CACHED_VIDEOS = 12;
+const VIDEO_READY_TIMEOUT = 250;
+
+const CARD_WIDTH = 144;
+const CARD_HEIGHT = 96;
+const CARD_GAP = 12;
+const ARROW_WIDTH = 40;
+const ARROW_GAP = 12;
+const SIDE_PADDING = 48;
 
 const ChevronLeft = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -19,6 +29,45 @@ const ChevronRight = () => (
   </svg>
 );
 
+const idle = (fn: () => void) =>
+  typeof (window as any).requestIdleCallback === 'function'
+    ? (window as any).requestIdleCallback(fn, { timeout: 2000 })
+    : window.setTimeout(fn, 200);
+
+const projectPin = (
+  pinX: number,
+  pinY: number,
+  container: { width: number; height: number },
+  image: { width: number; height: number }
+) => {
+  if (container.width === 0 || container.height === 0) {
+    return { left: `${pinX}%`, top: `${pinY}%`, visible: true };
+  }
+
+  const containerAspect = container.width / container.height;
+  const imageAspect = image.width / image.height;
+
+  let renderedWidth: number, renderedHeight: number, offsetX: number, offsetY: number;
+
+  if (containerAspect > imageAspect) {
+    renderedWidth = container.width;
+    renderedHeight = container.width / imageAspect;
+    offsetX = 0;
+    offsetY = (container.height - renderedHeight) / 2;
+  } else {
+    renderedHeight = container.height;
+    renderedWidth = container.height * imageAspect;
+    offsetX = (container.width - renderedWidth) / 2;
+    offsetY = 0;
+  }
+
+  const pixelX = offsetX + (pinX / 100) * renderedWidth;
+  const pixelY = offsetY + (pinY / 100) * renderedHeight;
+
+  const visible = pixelX >= 0 && pixelX <= container.width && pixelY >= 0 && pixelY <= container.height;
+
+  return { left: `${pixelX}px`, top: `${pixelY}px`, visible };
+};
 
 const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
   const { views, transitions, locations } = config;
@@ -26,123 +75,220 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
   const [currentViewId, setCurrentViewId] = useState(views[0]?.id || 1);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [activeTransitionKey, setActiveTransitionKey] = useState<string | null>(null);
+  const [fadeOutImage, setFadeOutImage] = useState<string | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [timelineExpanded, setTimelineExpanded] = useState(true);
   const [toolbarExpanded, setToolbarExpanded] = useState(true);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [viewport, setViewport] = useState({
+    windowWidth: window.innerWidth,
+    containerWidth: 0,
+    containerHeight: 0,
+  });
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 1920, height: 1080 });
   const [openPanels, setOpenPanels] = useState<{ location: AuraLocation; left: string; top: string }[]>([]);
-  const [altLayerIndex, setAltLayerIndex] = useState<Record<number, number>>({}); // viewId -> 0 (base) or 1+ (alternate)
+  const [altLayerIndex, setAltLayerIndex] = useState<Record<number, number>>({});
 
-  // Video cache
   const videoCache = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const stillCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  const warmQueue = useRef<string[]>([]);
+  const warmingKey = useRef<string | null>(null);
   const activeVideoRef = useRef<HTMLVideoElement | null>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const currentView = useMemo(() => views.find(v => v.id === currentViewId), [views, currentViewId]);
 
   const currentTransitions = useMemo(
     () => transitions.filter(t => t.from === currentViewId),
     [transitions, currentViewId]
   );
 
-  // Preload videos for transitions from the current view
-  useEffect(() => {
-    const cache = videoCache.current;
-    const neededKeys = new Set(currentTransitions.map(t => t.key));
+  // --- Still image cache ---
+  const preloadStill = useCallback((url?: string) => {
+    if (!url) return;
+    if (stillCache.current.has(url)) return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = url;
+    stillCache.current.set(url, img);
+  }, []);
 
-    for (const [key, video] of cache) {
-      if (!neededKeys.has(key) && key !== activeTransitionKey) {
+  // --- Video cache (LRU, persistent across navigation) ---
+  const acquireVideo = useCallback((key: string, url: string) => {
+    const cache = videoCache.current;
+    const existing = cache.get(key);
+    if (existing) {
+      cache.delete(key);
+      cache.set(key, existing);
+      return existing;
+    }
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    video.className = 'w-full h-full object-cover';
+    video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:translateZ(0)';
+    video.src = url;
+    cache.set(key, video);
+    return video;
+  }, []);
+
+  const evictExcess = useCallback((keep: Set<string>) => {
+    const cache = videoCache.current;
+    for (const key of Array.from(cache.keys())) {
+      if (cache.size <= MAX_CACHED_VIDEOS) break;
+      if (keep.has(key) || key === warmingKey.current) continue;
+      const video = cache.get(key)!;
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      cache.delete(key);
+    }
+  }, []);
+
+  const pumpWarmQueue = useRef<() => void>(() => {});
+  pumpWarmQueue.current = () => {
+    if (warmingKey.current) return;
+    const key = warmQueue.current.shift();
+    if (!key) return;
+    const video = videoCache.current.get(key);
+    if (!video || video.readyState >= 4) {
+      pumpWarmQueue.current();
+      return;
+    }
+    warmingKey.current = key;
+    const done = () => {
+      video.removeEventListener('canplaythrough', done);
+      video.removeEventListener('error', done);
+      warmingKey.current = null;
+      pumpWarmQueue.current();
+    };
+    video.addEventListener('canplaythrough', done);
+    video.addEventListener('error', done);
+    video.preload = 'auto';
+    video.load();
+  };
+
+  // Hovering a card is a strong signal the user is about to click it.
+  const prioritize = useCallback((key: string) => {
+    const video = videoCache.current.get(key);
+    if (!video || video.readyState >= 4) return;
+    const queued = warmQueue.current.indexOf(key);
+    if (queued >= 0) warmQueue.current.splice(queued, 1);
+    warmQueue.current.unshift(key);
+    if (video.preload !== 'auto') {
+      video.preload = 'auto';
+      video.load();
+    }
+  }, []);
+
+  // On arrival, register outgoing transitions at metadata weight and warm them
+  // one at a time so a single click never competes with four other downloads.
+  useEffect(() => {
+    const keys = currentTransitions.map(t => t.key);
+    for (const t of currentTransitions) acquireVideo(t.key, t.videoUrl);
+    evictExcess(new Set(keys));
+
+    warmQueue.current = keys.filter(k => {
+      const v = videoCache.current.get(k);
+      return v && v.readyState < 4;
+    });
+
+    const handle = idle(() => pumpWarmQueue.current());
+    return () => {
+      if (typeof (window as any).cancelIdleCallback === 'function') {
+        (window as any).cancelIdleCallback(handle);
+      } else {
+        clearTimeout(handle);
+      }
+    };
+  }, [currentTransitions, acquireVideo, evictExcess]);
+
+  // Stills are small now; fetch the active one eagerly and the rest when idle.
+  useEffect(() => {
+    preloadStill(currentView?.imageUrl);
+    const handle = idle(() => {
+      for (const v of views) {
+        preloadStill(v.thumbUrl);
+        preloadStill(v.imageUrl);
+        for (const alt of v.alternateLayers || []) preloadStill(alt.imageUrl);
+      }
+    });
+    return () => {
+      if (typeof (window as any).cancelIdleCallback === 'function') {
+        (window as any).cancelIdleCallback(handle);
+      } else {
+        clearTimeout(handle);
+      }
+    };
+  }, [views, currentView?.imageUrl, preloadStill]);
+
+  // Single rAF-throttled measure pass feeding one state object.
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const el = containerRef.current;
+      setViewport(prev => {
+        const next = {
+          windowWidth: window.innerWidth,
+          containerWidth: el ? el.offsetWidth : prev.containerWidth,
+          containerHeight: el ? el.offsetHeight : prev.containerHeight,
+        };
+        return next.windowWidth === prev.windowWidth &&
+          next.containerWidth === prev.containerWidth &&
+          next.containerHeight === prev.containerHeight
+          ? prev
+          : next;
+      });
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    window.addEventListener('resize', schedule);
+    const observer = new ResizeObserver(schedule);
+    if (containerRef.current) observer.observe(containerRef.current);
+
+    return () => {
+      window.removeEventListener('resize', schedule);
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      for (const video of videoCache.current.values()) {
         video.pause();
         video.removeAttribute('src');
         video.load();
-        cache.delete(key);
       }
-    }
-
-    for (const t of currentTransitions) {
-      if (!cache.has(t.key)) {
-        const video = document.createElement('video');
-        video.muted = true;
-        video.playsInline = true;
-        video.preload = 'auto';
-        video.className = 'w-full h-full object-cover';
-        video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:translateZ(0)';
-        video.src = t.videoUrl;
-        video.load();
-        cache.set(t.key, video);
-      }
-    }
-  }, [currentTransitions, activeTransitionKey]);
-
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    const updateContainerSize = () => {
-      if (containerRef.current) {
-        setContainerSize({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        });
-      }
+      videoCache.current.clear();
     };
-    updateContainerSize();
-    window.addEventListener('resize', updateContainerSize);
-    return () => window.removeEventListener('resize', updateContainerSize);
   }, []);
-
-  const calculatePinPosition = (pinX: number, pinY: number) => {
-    if (containerSize.width === 0 || containerSize.height === 0) {
-      return { left: `${pinX}%`, top: `${pinY}%`, visible: true };
-    }
-
-    const containerAspect = containerSize.width / containerSize.height;
-    const imageAspect = imageNaturalSize.width / imageNaturalSize.height;
-
-    let renderedWidth: number, renderedHeight: number, offsetX: number, offsetY: number;
-
-    if (containerAspect > imageAspect) {
-      renderedWidth = containerSize.width;
-      renderedHeight = containerSize.width / imageAspect;
-      offsetX = 0;
-      offsetY = (containerSize.height - renderedHeight) / 2;
-    } else {
-      renderedHeight = containerSize.height;
-      renderedWidth = containerSize.height * imageAspect;
-      offsetX = (containerSize.width - renderedWidth) / 2;
-      offsetY = 0;
-    }
-
-    const pixelX = offsetX + (pinX / 100) * renderedWidth;
-    const pixelY = offsetY + (pinY / 100) * renderedHeight;
-
-    const visible = pixelX >= 0 && pixelX <= containerSize.width &&
-                    pixelY >= 0 && pixelY <= containerSize.height;
-
-    return { left: `${pixelX}px`, top: `${pixelY}px`, visible };
-  };
 
   const [videoExpanded, setVideoExpanded] = useState(false);
   const ytPlayerRef = useRef<any>(null);
   const ytContainerRef = useRef<HTMLDivElement>(null);
   const ytDragRef = useRef<{ isDragging: boolean; lastX: number; lastY: number; startX: number; startY: number; didDrag: boolean }>({ isDragging: false, lastX: 0, lastY: 0, startX: 0, startY: 0, didDrag: false });
 
-  // Load YouTube IFrame API once
+  const embed = currentView?.embed;
+  const showEmbed = !!embed && embed.type === 'youtube360' && !isTransitioning;
+
+  // Only pull in the YouTube API for projects that actually use an embed.
+  const wantsEmbed = useMemo(() => views.some(v => v.embed?.type === 'youtube360'), [views]);
+
   useEffect(() => {
-    if ((window as any).YT) return;
+    if (!wantsEmbed || (window as any).YT) return;
     const tag = document.createElement('script');
     tag.src = 'https://www.youtube.com/iframe_api';
     document.body.appendChild(tag);
-  }, []);
+  }, [wantsEmbed]);
 
-  // Create/destroy YT player when Station 1 view is active
   useEffect(() => {
-    if (currentViewId !== 2 || isTransitioning) {
-      // Destroy player when leaving view
+    if (!showEmbed || !embed) {
       if (ytPlayerRef.current) {
         ytPlayerRef.current.destroy();
         ytPlayerRef.current = null;
@@ -153,7 +299,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
     const createPlayer = () => {
       if (!ytContainerRef.current || ytPlayerRef.current) return;
       ytPlayerRef.current = new (window as any).YT.Player(ytContainerRef.current, {
-        videoId: 'm894UVinb2M',
+        videoId: embed.videoId,
         playerVars: { enablejsapi: 1, playsinline: 1, rel: 0 },
       });
     };
@@ -163,9 +309,8 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
     } else {
       (window as any).onYouTubeIframeAPIReady = createPlayer;
     }
-  }, [currentViewId, isTransitioning]);
+  }, [showEmbed, embed]);
 
-  // 360 drag handler
   const handleYtMouseDown = useCallback((e: React.MouseEvent) => {
     ytDragRef.current = { isDragging: true, lastX: e.clientX, lastY: e.clientY, startX: e.clientX, startY: e.clientY, didDrag: false };
     e.preventDefault();
@@ -198,127 +343,153 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
   }, []);
 
-  const handleYtClick = useCallback((e: React.MouseEvent) => {
-    // Only toggle play/pause on short clicks (not drags)
+  const handleYtClick = useCallback(() => {
     if (!ytPlayerRef.current) return;
     const state = ytPlayerRef.current.getPlayerState();
     if (state === 1) { ytPlayerRef.current.pauseVideo(); }
     else { ytPlayerRef.current.playVideo(); }
   }, []);
 
-  const currentView = views.find(n => n.id === currentViewId);
-
   useEffect(() => {
-    if (currentView?.imageUrl) {
-      const img = new Image();
-      img.onload = () => {
-        setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
-      };
-      img.src = currentView.imageUrl;
-    }
+    if (!currentView?.imageUrl) return;
+    const img = new Image();
+    img.onload = () => setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+    img.src = currentView.imageUrl;
   }, [currentView?.imageUrl]);
 
   const handleTransition = useCallback((targetId: number) => {
     if (isTransitioning || targetId === currentViewId) return;
 
+    const targetView = views.find(v => v.id === targetId);
+    const fromImage = currentView?.imageUrl ?? null;
     const transitionKey = `${currentViewId}-${targetId}`;
     const video = videoCache.current.get(transitionKey);
 
-    if (video) {
-      // Keep current view's still visible — don't swap until video ends
-      const container = videoContainerRef.current;
-      if (container) {
-        container.innerHTML = '';
-        container.appendChild(video);
-      }
-      activeVideoRef.current = video;
+    // The destination still has the whole transition to arrive.
+    preloadStill(targetView?.imageUrl);
 
-      setActiveTransitionKey(transitionKey);
-      setIsTransitioning(true);
-
-      setVideoExpanded(false);
-      video.onended = () => {
-        // Video finished — pause on last frame (it stays visible in DOM).
-        // Swap the still behind it, wait for the image to load, then remove the video.
-        video.pause();
-
-        const targetView = views.find(v => v.id === targetId);
-        if (targetView?.imageUrl) {
-          const img = new Image();
-          img.onload = () => {
-            // Still is now painted behind the paused video — safe to remove
-            setCurrentViewId(targetId);
-            // Use rAF to ensure React has painted the new background before removing video
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                setIsTransitioning(false);
-                setActiveTransitionKey(null);
-                activeVideoRef.current = null;
-                if (container) container.innerHTML = '';
-              });
-            });
-          };
-          img.src = targetView.imageUrl;
-        } else {
-          setCurrentViewId(targetId);
-          setIsTransitioning(false);
-          setActiveTransitionKey(null);
-          activeVideoRef.current = null;
-          if (container) container.innerHTML = '';
-        }
-      };
-
-      // Play immediately if buffered, otherwise wait for canplay
-      const startPlayback = () => {
-        video.play().catch(e => console.error("Video play failed:", e));
-      };
-
-      video.currentTime = 0;
-      if (video.readyState >= 3) {
-        // HAVE_FUTURE_DATA or better — play immediately
-        startPlayback();
-      } else {
-        // Wait for enough data to play
-        const onCanPlay = () => {
-          video.removeEventListener('canplay', onCanPlay);
-          startPlayback();
-        };
-        video.addEventListener('canplay', onCanPlay);
-      }
-    } else {
+    const crossfade = () => {
+      setFadeOutImage(fromImage);
       setCurrentViewId(targetId);
+      setIsTransitioning(false);
+      setActiveTransitionKey(null);
+      activeVideoRef.current = null;
+      const container = videoContainerRef.current;
+      if (container) container.replaceChildren();
+    };
+
+    if (!video) {
+      crossfade();
+      return;
     }
-  }, [isTransitioning, currentViewId]);
 
-  // Card dimensions
-  const CARD_WIDTH = 144;
-  const CARD_GAP = 12;
-  const ARROW_WIDTH = 40;
-  const ARROW_GAP = 12;
-  const SIDE_PADDING = 48;
+    setActiveTransitionKey(transitionKey);
+    setIsTransitioning(true);
+    setVideoExpanded(false);
 
-  const availableWidth = windowWidth - (2 * SIDE_PADDING) - (2 * ARROW_WIDTH) - (2 * ARROW_GAP);
+    video.onended = () => {
+      video.pause();
+      const swap = () => {
+        setCurrentViewId(targetId);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setIsTransitioning(false);
+            setActiveTransitionKey(null);
+            activeVideoRef.current = null;
+            const container = videoContainerRef.current;
+            if (container) container.replaceChildren();
+          });
+        });
+      };
+
+      const cached = targetView?.imageUrl ? stillCache.current.get(targetView.imageUrl) : undefined;
+      if (cached && !cached.complete) {
+        cached.addEventListener('load', swap, { once: true });
+        cached.addEventListener('error', swap, { once: true });
+      } else {
+        swap();
+      }
+    };
+
+    let settled = false;
+    const play = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      video.removeEventListener('canplay', play);
+      const container = videoContainerRef.current;
+      if (container) container.replaceChildren(video);
+      activeVideoRef.current = video;
+      video.currentTime = 0;
+      video.play().catch(() => {
+        video.onended = null;
+        crossfade();
+      });
+    };
+
+    // Never sit on a blank frame waiting for bytes — fall back to a crossfade.
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      video.removeEventListener('canplay', play);
+      video.onended = null;
+      crossfade();
+    }, VIDEO_READY_TIMEOUT);
+
+    if (video.readyState >= 3) {
+      play();
+    } else {
+      video.addEventListener('canplay', play);
+      if (video.preload !== 'auto') {
+        video.preload = 'auto';
+        video.load();
+      }
+    }
+  }, [isTransitioning, currentViewId, views, currentView?.imageUrl, preloadStill]);
+
+  const availableWidth = viewport.windowWidth - (2 * SIDE_PADDING) - (2 * ARROW_WIDTH) - (2 * ARROW_GAP);
   const maxCardsThatFit = Math.floor((availableWidth + CARD_GAP) / (CARD_WIDTH + CARD_GAP));
   const MAX_VISIBLE_CARDS = Math.max(2, Math.min(10, maxCardsThatFit, views.length));
 
-  const scrollCarousel = (direction: 'left' | 'right') => {
-    const maxIndex = Math.max(0, views.length - MAX_VISIBLE_CARDS);
-    if (direction === 'left') {
-      setCarouselIndex(prev => Math.max(0, prev - 1));
-    } else {
-      setCarouselIndex(prev => Math.min(maxIndex, prev + 1));
-    }
-  };
+  const maxIndex = Math.max(0, views.length - MAX_VISIBLE_CARDS);
+  const validCarouselIndex = Math.min(carouselIndex, maxIndex);
 
-  const validCarouselIndex = Math.min(carouselIndex, Math.max(0, views.length - MAX_VISIBLE_CARDS));
-  if (validCarouselIndex !== carouselIndex) {
-    setCarouselIndex(validCarouselIndex);
-  }
+  const scrollCarousel = useCallback((direction: 'left' | 'right') => {
+    setCarouselIndex(prev => {
+      const clamped = Math.min(prev, maxIndex);
+      return direction === 'left' ? Math.max(0, clamped - 1) : Math.min(maxIndex, clamped + 1);
+    });
+  }, [maxIndex]);
 
   const canScrollLeft = validCarouselIndex > 0;
-  const canScrollRight = validCarouselIndex < views.length - MAX_VISIBLE_CARDS;
+  const canScrollRight = validCarouselIndex < maxIndex;
 
-  const CARD_HEIGHT = 96;
+  const pinPositions = useMemo(() => {
+    const container = { width: viewport.containerWidth, height: viewport.containerHeight };
+    return locations.map(location => {
+      const viewPosition = location.viewPositions.find(vp => vp.viewId === currentViewId);
+      if (!viewPosition) return null;
+      const pos = projectPin(viewPosition.x, viewPosition.y, container, imageNaturalSize);
+      return pos.visible ? { location, ...pos } : null;
+    });
+  }, [locations, currentViewId, viewport.containerWidth, viewport.containerHeight, imageNaturalSize]);
+
+  const handlePinClick = useCallback((loc: AuraLocation, left: string, top: string) => {
+    setOpenPanels(prev =>
+      prev.some(p => p.location.id === loc.id)
+        ? prev.filter(p => p.location.id !== loc.id)
+        : [...prev, { location: loc, left, top }]
+    );
+  }, []);
+
+  const handleCardClick = useCallback((node: ViewNode) => {
+    if (node.id === currentViewId && node.alternateLayers && node.alternateLayers.length > 0) {
+      const totalLayers = node.alternateLayers.length + 1;
+      setAltLayerIndex(prev => ({ ...prev, [node.id]: ((prev[node.id] || 0) + 1) % totalLayers }));
+    } else {
+      handleTransition(node.id);
+    }
+  }, [currentViewId, handleTransition]);
 
   return (
     <div className="relative w-full h-full bg-black overflow-hidden">
@@ -334,10 +505,25 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
         }}
       />
 
+      {/* Layer 0a: Outgoing still, fading out when no transition video was ready */}
+      {fadeOutImage && (
+        <div
+          className="absolute inset-0 z-[2]"
+          style={{
+            backgroundImage: `url(${fadeOutImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            animation: 'viewCrossfade 300ms ease-out forwards',
+            pointerEvents: 'none',
+          }}
+          onAnimationEnd={() => setFadeOutImage(null)}
+        />
+      )}
+
       {/* Layer 0b: Alternate layer (fades in/out on top of base) */}
       {currentView?.alternateLayers && currentView.alternateLayers.length > 0 && (
         currentView.alternateLayers.map((alt, i) => {
-          const activeAlt = (altLayerIndex[currentViewId] || 0) - 1; // -1 = base, 0 = first alt, etc.
+          const activeAlt = (altLayerIndex[currentViewId] || 0) - 1;
           return (
             <div
               key={`alt-${currentViewId}-${i}`}
@@ -356,29 +542,17 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
 
       {/* Layer 1: Location Pins (behind video) */}
       <div className="absolute inset-0 z-[5]">
-        {locations.map(location => {
-          const viewPosition = location.viewPositions.find(vp => vp.viewId === currentViewId);
-          if (!viewPosition) return null;
-
-          const pinPos = calculatePinPosition(viewPosition.x, viewPosition.y);
-          if (!pinPos.visible) return null;
-
+        {pinPositions.map((entry, i) => {
+          if (!entry) return null;
           return (
             <AuraPin
-              key={location.id}
-              location={location}
-              left={pinPos.left}
-              top={pinPos.top}
+              key={locations[i].id}
+              location={entry.location}
+              left={entry.left}
+              top={entry.top}
               isVisible={!isTransitioning}
-              isSelected={openPanels.some(p => p.location.id === location.id)}
-              onClick={(loc, left, top) => {
-                const isAlreadyOpen = openPanels.some(p => p.location.id === loc.id);
-                if (isAlreadyOpen) {
-                  setOpenPanels(prev => prev.filter(p => p.location.id !== loc.id));
-                } else {
-                  setOpenPanels(prev => [...prev, { location: loc, left, top }]);
-                }
-              }}
+              isSelected={openPanels.some(p => p.location.id === entry.location.id)}
+              onClick={handlePinClick}
             />
           );
         })}
@@ -467,10 +641,9 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
         </div>
       ))}
 
-      {/* YouTube 360 embed for Station 1 view */}
-      {currentViewId === 2 && !isTransitioning && (
+      {/* YouTube 360 embed */}
+      {showEmbed && (
         <>
-          {/* Backdrop when expanded */}
           {videoExpanded && (
             <div
               className="absolute inset-0"
@@ -494,10 +667,8 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
               transition: 'width 400ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 400ms ease',
             }}
           >
-            {/* YT Player container */}
             <div ref={ytContainerRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
 
-            {/* Drag overlay for 360 control (expanded) / click-to-expand (collapsed) */}
             <div
               style={{
                 position: 'absolute',
@@ -514,11 +685,10 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
                 if (!videoExpanded) {
                   setVideoExpanded(true);
                 } else if (!ytDragRef.current.didDrag) {
-                  handleYtClick({} as React.MouseEvent);
+                  handleYtClick();
                 }
               }}
             >
-              {/* Play button when collapsed */}
               {!videoExpanded && (
                 <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.15)' }}>
                   <div
@@ -553,7 +723,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
         onNavToggle={() => setTimelineExpanded(prev => !prev)}
       />
 
-      {/* Layer 3: Video container (on top of everything during transitions, pass-through when empty) */}
+      {/* Layer 3: Video container (on top during transitions, pass-through when empty) */}
       <div
         ref={videoContainerRef}
         className="absolute inset-0 z-40"
@@ -619,25 +789,19 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
                   const isTarget = isTransitioning && transitions.some(t => t.key === activeTransitionKey && t.to === node.id);
                   const isInView = actualIndex >= validCarouselIndex && actualIndex < validCarouselIndex + MAX_VISIBLE_CARDS;
 
-                  // Dock effect: active/target card grows, others shrink
+                  // Dock effect runs on the compositor: the layout box stays fixed
+                  // and only `transform` animates, so navigating never triggers layout.
                   const isBig = isActive || isTarget;
-                  const cardW = timelineExpanded ? (isBig ? CARD_WIDTH * 1.15 : CARD_WIDTH * 0.9) : (isActive ? 10 : 6);
-                  const cardH = timelineExpanded ? (isBig ? CARD_HEIGHT * 1.15 : CARD_HEIGHT * 0.9) : (isActive ? 10 : 6);
+                  const scale = isBig ? 1.15 : 0.9;
+                  const dotSize = isActive ? 10 : 6;
                   const borderRadius = timelineExpanded ? 12 : (isActive ? 5 : 3);
 
                   return (
                     <button
                       key={node.id}
-                      onClick={() => {
-                        if (node.id === currentViewId && node.alternateLayers && node.alternateLayers.length > 0) {
-                          // Cycle through: base -> alt1 -> alt2 -> ... -> base
-                          const totalLayers = node.alternateLayers.length + 1;
-                          const current = altLayerIndex[node.id] || 0;
-                          setAltLayerIndex(prev => ({ ...prev, [node.id]: (current + 1) % totalLayers }));
-                        } else {
-                          handleTransition(node.id);
-                        }
-                      }}
+                      onClick={() => handleCardClick(node)}
+                      onPointerEnter={() => prioritize(`${currentViewId}-${node.id}`)}
+                      onFocus={() => prioritize(`${currentViewId}-${node.id}`)}
                       disabled={isTransitioning}
                       className={`
                         relative overflow-hidden flex-shrink-0
@@ -648,19 +812,22 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
                         ${isTransitioning ? 'cursor-wait' : 'cursor-pointer'}
                       `}
                       style={{
-                        width: cardW,
-                        height: cardH,
+                        width: timelineExpanded ? CARD_WIDTH : dotSize,
+                        height: timelineExpanded ? CARD_HEIGHT : dotSize,
+                        transform: timelineExpanded ? `scale(${scale})` : 'none',
                         borderRadius,
                         opacity: timelineExpanded ? (isInView ? 1 : 0) : 1,
                         border: timelineExpanded ? '1px solid rgba(255,255,255,0.2)' : 'none',
                         boxSizing: 'border-box',
-                        transition: 'all 1.5s ease-out',
+                        willChange: 'transform',
+                        transition:
+                          'transform 600ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease-out, width 300ms ease-out, height 300ms ease-out, border-radius 300ms ease-out',
                       }}
                     >
                       <div
                         className="absolute inset-0 bg-cover bg-center"
                         style={{
-                          backgroundImage: `url(${node.imageUrl})`,
+                          backgroundImage: `url(${node.thumbUrl || node.imageUrl})`,
                           opacity: timelineExpanded ? 1 : 0,
                           transition: 'opacity 300ms ease-out',
                         }}
@@ -691,9 +858,8 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
                       >
                         {node.name}
                       </span>
-                      {/* Layer indicator dots */}
                       {timelineExpanded && node.alternateLayers && node.alternateLayers.length > 0 && isActive && (
-                        <div className="absolute top-2 right-2 flex gap-1" style={{ opacity: timelineExpanded ? 1 : 0, transition: 'opacity 300ms ease-out' }}>
+                        <div className="absolute top-2 right-2 flex gap-1">
                           {[0, ...node.alternateLayers.map((_, i) => i + 1)].map(layerIdx => (
                             <div
                               key={layerIdx}

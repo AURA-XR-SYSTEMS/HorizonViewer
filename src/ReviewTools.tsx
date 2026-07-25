@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 
 // --- Icons ---
 const PenIcon = () => (
@@ -57,6 +57,10 @@ interface TextNote { id: string; x: number; y: number; text: string; color: stri
 interface ReviewImage { id: string; x: number; y: number; width: number; height: number; src: string; }
 interface StrokePath { id: string; points: { x: number; y: number }[]; color: string; width: number; }
 
+interface ViewData { pins: ReviewPin[]; notes: TextNote[]; images: ReviewImage[]; strokes: StrokePath[]; }
+
+const EMPTY_VIEW: ViewData = Object.freeze({ pins: [], notes: [], images: [], strokes: [] });
+
 type UndoEntry =
   | { type: 'pin'; viewId: number; pin: ReviewPin }
   | { type: 'text'; viewId: number; note: TextNote }
@@ -73,7 +77,10 @@ const glassStyle = {
   WebkitBackdropFilter: 'blur(6px)',
   border: '1px solid rgba(255,255,255,0.3)',
   boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+  transform: 'translateZ(0)',
 };
+
+const flatGlassStyle = { ...glassStyle, backdropFilter: 'none', WebkitBackdropFilter: 'none' };
 
 interface ReviewToolsProps {
   expanded: boolean;
@@ -91,15 +98,13 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   // Per-view state — plain objects, not Maps
-  type ViewData = { pins: ReviewPin[]; notes: TextNote[]; images: ReviewImage[]; strokes: StrokePath[] };
   const [views, setViews] = useState<Record<number, ViewData>>({});
-  const getView = (id: number): ViewData => views[id] || { pins: [], notes: [], images: [], strokes: [] };
-  const updateView = (id: number, fn: (v: ViewData) => Partial<ViewData>) => {
+  const updateView = useCallback((id: number, fn: (v: ViewData) => Partial<ViewData>) => {
     setViews(prev => {
-      const old = prev[id] || { pins: [], notes: [], images: [], strokes: [] };
+      const old = prev[id] || EMPTY_VIEW;
       return { ...prev, [id]: { ...old, ...fn(old) } };
     });
-  };
+  }, []);
 
   // Undo stack
   const [, setUndoStack] = useState<UndoEntry[]>([]);
@@ -117,14 +122,17 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
   const [dragging, setDragging] = useState<{ id: string; type: string; offsetX: number; offsetY: number } | null>(null);
   const [resizing, setResizing] = useState<{ id: string; startW: number; startX: number } | null>(null);
 
-  const v = getView(viewId);
-  const currentPins = v.pins;
-  const currentNotes = v.notes;
-  const currentImages = v.images;
-  const currentStrokes = v.strokes;
+  const viewData = views[viewId];
+  const v = useMemo(() => viewData || EMPTY_VIEW, [viewData]);
+  const currentPins = useMemo(() => v.pins, [v]);
+  const currentNotes = useMemo(() => v.notes, [v]);
+  const currentImages = useMemo(() => v.images, [v]);
+  const currentStrokes = useMemo(() => v.strokes, [v]);
 
-  // Live stroke rendering (in-progress only)
-  const [livePoints, setLivePoints] = useState<{ x: number; y: number }[]>([]);
+  // Live stroke rendering (in-progress only, driven imperatively)
+  const liveStrokeRef = useRef<SVGPolylineElement>(null);
+  const livePointsStr = useRef('');
+  const liveRaf = useRef<number | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // --- Helpers ---
@@ -138,6 +146,25 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
   const pushUndo = useCallback((entry: UndoEntry) => {
     setUndoStack(prev => [...prev, entry]);
   }, []);
+
+  const flushLiveStroke = useCallback(() => {
+    liveRaf.current = null;
+    liveStrokeRef.current?.setAttribute('points', livePointsStr.current);
+  }, []);
+
+  const addLivePoint = useCallback((p: { x: number; y: number }) => {
+    currentStroke.current.push(p);
+    livePointsStr.current += `${livePointsStr.current ? ' ' : ''}${p.x * 1000},${p.y * 1000}`;
+  }, []);
+
+  const resetLiveStroke = useCallback(() => {
+    if (liveRaf.current !== null) { cancelAnimationFrame(liveRaf.current); liveRaf.current = null; }
+    currentStroke.current = [];
+    livePointsStr.current = '';
+    liveStrokeRef.current?.setAttribute('points', '');
+  }, []);
+
+  useEffect(() => () => { if (liveRaf.current !== null) cancelAnimationFrame(liveRaf.current); }, []);
 
   // --- Undo ---
   const handleUndo = useCallback(() => {
@@ -156,7 +183,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
       }
       return rest;
     });
-  }, []);
+  }, [updateView]);
 
   // Ctrl+Z
   useEffect(() => {
@@ -171,7 +198,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
     updateView(viewId, () => ({ pins: [], notes: [], images: [], strokes: [] }));
     setEditingPin(null); setEditingNote(null);
     setUndoStack([]);
-  }, [viewId]);
+  }, [viewId, updateView]);
 
   // --- Mouse handlers (single interaction layer) ---
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -179,7 +206,8 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
     const pos = getPos(e);
     if (activeTool === 'sketch') {
       isDrawing.current = true;
-      currentStroke.current = [pos];
+      resetLiveStroke();
+      addLivePoint(pos);
     } else if (activeTool === 'eraser') {
       const threshold = 0.02;
       updateView(viewId, v => ({
@@ -195,7 +223,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
     } else if (activeTool === 'image') {
       fileInputRef.current?.click();
     }
-  }, [activeTool, activeColor, viewId, getPos, isTransitioning, pushUndo]);
+  }, [activeTool, activeColor, viewId, getPos, isTransitioning, pushUndo, updateView, resetLiveStroke, addLivePoint]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // Text/leader drag
@@ -210,10 +238,12 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
     }
     // Sketch
     if (!isDrawing.current || activeTool !== 'sketch') return;
-    const pos = getPos(e);
-    currentStroke.current.push(pos);
-    setLivePoints([...currentStroke.current]);
-  }, [activeTool, getPos]);
+    const native = e.nativeEvent as MouseEvent & { getCoalescedEvents?: () => MouseEvent[] };
+    const coalesced = typeof native.getCoalescedEvents === 'function' ? native.getCoalescedEvents() : null;
+    if (coalesced && coalesced.length) coalesced.forEach(ce => addLivePoint(getPos(ce)));
+    else addLivePoint(getPos(e));
+    if (liveRaf.current === null) liveRaf.current = requestAnimationFrame(flushLiveStroke);
+  }, [activeTool, getPos, addLivePoint, flushLiveStroke]);
 
   const handleMouseUp = useCallback(() => {
     // Text/leader finalize
@@ -244,9 +274,8 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
       updateView(viewId, vd => ({ strokes: [...vd.strokes, newStroke] }));
       pushUndo({ type: 'stroke', viewId });
     }
-    currentStroke.current = [];
-    setLivePoints([]);
-  }, [activeColor, strokeWidth, viewId, textDraftPos, pushUndo]);
+    resetLiveStroke();
+  }, [activeColor, strokeWidth, viewId, textDraftPos, pushUndo, updateView, resetLiveStroke]);
 
   // Image upload
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -268,7 +297,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
     reader.readAsDataURL(file);
     e.target.value = '';
     setActiveTool('select');
-  }, [viewId, pushUndo]);
+  }, [viewId, pushUndo, updateView]);
 
   // Annotation drag
   const handleAnnotationMouseDown = useCallback((e: React.MouseEvent, id: string, type: string) => {
@@ -280,27 +309,44 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
 
   useEffect(() => {
     if (!dragging) return;
-    const onMove = (e: MouseEvent) => {
-      const pos = getPos(e);
+    let raf: number | null = null;
+    let pending: MouseEvent | null = null;
+    const flush = () => {
+      raf = null;
+      if (!pending) return;
+      const pos = getPos(pending);
+      pending = null;
       if (dragging.type === 'pin') updateView(viewId, vd => ({ pins: vd.pins.map(x => x.id === dragging.id ? { ...x, x: pos.x, y: pos.y } : x) }));
       else if (dragging.type === 'note') updateView(viewId, vd => ({ notes: vd.notes.map(x => x.id === dragging.id ? { ...x, x: pos.x, y: pos.y } : x) }));
       else if (dragging.type === 'anchor') { const realId = dragging.id.replace('-anchor', ''); updateView(viewId, vd => ({ notes: vd.notes.map(x => x.id === realId ? { ...x, anchorX: pos.x, anchorY: pos.y } : x) })); }
       else if (dragging.type === 'image') updateView(viewId, vd => ({ images: vd.images.map(x => x.id === dragging.id ? { ...x, x: pos.x, y: pos.y } : x) }));
     };
-    const onUp = () => setDragging(null);
+    const onMove = (e: MouseEvent) => {
+      pending = e;
+      if (raf === null) raf = requestAnimationFrame(flush);
+    };
+    const onUp = () => {
+      if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
+      flush();
+      setDragging(null);
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-  }, [dragging, viewId, getPos]);
+    return () => { if (raf !== null) cancelAnimationFrame(raf); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [dragging, viewId, getPos, updateView]);
 
   // Image resize
   useEffect(() => {
     if (!resizing) return;
-    const onMove = (e: MouseEvent) => {
+    let raf: number | null = null;
+    let pending: MouseEvent | null = null;
+    const flush = () => {
+      raf = null;
       const el = overlayRef.current;
-      if (!el) return;
+      if (!pending || !el) return;
       const r = el.getBoundingClientRect();
-      const deltaX = (e.clientX - resizing.startX) / r.width;
+      const deltaX = (pending.clientX - resizing.startX) / r.width;
+      pending = null;
       const newW = Math.max(0.05, resizing.startW + deltaX);
       updateView(viewId, vd => ({
         images: vd.images.map(img => {
@@ -310,15 +356,25 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
         })
       }));
     };
-    const onUp = () => setResizing(null);
+    const onMove = (e: MouseEvent) => {
+      pending = e;
+      if (raf === null) raf = requestAnimationFrame(flush);
+    };
+    const onUp = () => {
+      if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
+      flush();
+      setResizing(null);
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-  }, [resizing, viewId]);
+    return () => { if (raf !== null) cancelAnimationFrame(raf); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [resizing, viewId, updateView]);
 
-  const deletePin = useCallback((id: string) => { updateView(viewId, vd => ({ pins: vd.pins.filter(x => x.id !== id) })); setEditingPin(null); }, [viewId]);
-  const deleteNote = useCallback((id: string) => { updateView(viewId, vd => ({ notes: vd.notes.filter(x => x.id !== id) })); setEditingNote(null); }, [viewId]);
-  const deleteImage = useCallback((id: string) => { updateView(viewId, vd => ({ images: vd.images.filter(x => x.id !== id) })); }, [viewId]);
+  const deletePin = useCallback((id: string) => { updateView(viewId, vd => ({ pins: vd.pins.filter(x => x.id !== id) })); setEditingPin(null); }, [viewId, updateView]);
+  const deleteNote = useCallback((id: string) => { updateView(viewId, vd => ({ notes: vd.notes.filter(x => x.id !== id) })); setEditingNote(null); }, [viewId, updateView]);
+  const deleteImage = useCallback((id: string) => { updateView(viewId, vd => ({ images: vd.images.filter(x => x.id !== id) })); }, [viewId, updateView]);
+
+  const headerGlass = isTransitioning ? flatGlassStyle : glassStyle;
 
   const toolCursor = activeTool === 'sketch' ? 'crosshair' : activeTool === 'pin' ? 'crosshair' : activeTool === 'text' ? 'crosshair' : activeTool === 'eraser' ? 'crosshair' : activeTool === 'image' ? 'copy' : 'default';
 
@@ -337,7 +393,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
         <div className="flex flex-col items-center gap-1.5">
           <div
             className="w-full flex items-center rounded-2xl transition-all duration-300"
-            style={{ ...glassStyle, height: expanded ? 52 : 0, opacity: expanded ? 1 : 0, overflow: 'hidden', padding: expanded ? '0 16px' : '0' }}
+            style={{ ...headerGlass, height: expanded ? 52 : 0, opacity: expanded ? 1 : 0, overflow: 'hidden', padding: expanded ? '0 16px' : '0' }}
           >
             {/* Left — logo */}
             <div className="flex items-center gap-2 flex-shrink-0" style={{ minWidth: 140 }}>
@@ -419,17 +475,15 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
               vectorEffect="non-scaling-stroke"
             />
           ))}
-          {livePoints.length >= 2 && (
-            <polyline
-              points={livePoints.map(p => `${p.x * 1000},${p.y * 1000}`).join(' ')}
-              fill="none"
-              stroke={activeColor}
-              strokeWidth={strokeWidth}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
+          <polyline
+            ref={liveStrokeRef}
+            fill="none"
+            stroke={activeColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
         </svg>
 
         {/* Interaction layer */}
@@ -471,7 +525,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
             {editingPin !== pin.id && pin.comment && (
               <div
                 className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 rounded-lg px-2.5 py-1 text-xs whitespace-nowrap"
-                style={{ ...glassStyle, color: 'rgba(25,25,25,0.75)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                style={{ ...glassStyle, transform: 'translateX(-50%) translateZ(0)', color: 'rgba(25,25,25,0.75)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}
               >
                 {pin.comment}
               </div>
@@ -483,7 +537,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
               </svg>
             </div>
             {editingPin === pin.id && (
-              <div className="absolute left-8 top-1/2 -translate-y-1/2 rounded-xl p-3 space-y-2" style={{ ...glassStyle, border: `1px solid ${pin.color}44`, minWidth: 220, zIndex: 100 }} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+              <div className="absolute left-8 top-1/2 -translate-y-1/2 rounded-xl p-3 space-y-2" style={{ ...glassStyle, transform: 'translateY(-50%) translateZ(0)', border: `1px solid ${pin.color}44`, minWidth: 220, zIndex: 100 }} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
                 <textarea placeholder="Note..." value={pin.comment} onChange={(e) => updateView(viewId, vd => ({ pins: vd.pins.map(x => x.id === pin.id ? { ...x, comment: e.target.value } : x) }))} className="w-full bg-white/10 border border-white/20 rounded-lg px-2 py-1 text-white text-xs outline-none focus:border-white/40 resize-none" rows={3} autoFocus />
                 <div className="flex justify-between items-center">
                   <div className="flex gap-1">

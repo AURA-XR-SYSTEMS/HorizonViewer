@@ -1,7 +1,14 @@
+export interface ViewEmbed {
+  type: 'youtube360';
+  videoId: string;
+}
+
 export interface ViewNode {
   id: number;
   name: string;
   imageUrl: string;
+  thumbUrl?: string;
+  embed?: ViewEmbed;
   alternateLayers?: { name: string; imageUrl: string }[];
 }
 

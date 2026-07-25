@@ -8,8 +8,8 @@ Usage:
 
 Output structure:
     public/assets/projects/{project-slug}/
-        views/          Static JPG per view
-        transitions/    MP4 per transition folder
+        views/          Full-res WebP still + 288px WebP thumbnail per view
+        transitions/    Web-optimized MP4 per transition folder (faststart verified)
         config.json     ProjectConfig for the viewer
 """
 
@@ -17,7 +17,7 @@ import argparse
 import json
 import os
 import re
-import shutil
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -28,12 +28,69 @@ DEFAULT_SOURCE_DIR = Path(r"C:\Perforce\AURA_DEV_WORKSPACE\AURA_MAUI\Saved\Video
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROJECTS_DIR = PROJECT_ROOT / "public" / "assets" / "projects"
 
+# Still image encoding
+WEBP_QUALITY = 82
+THUMB_WIDTH = 288
+THUMB_QUALITY = 80
+ALPHA_PIX_FMTS = ("rgba", "argb", "bgra", "ya", "pal8")
+
 def slugify(name: str) -> str:
     """Convert view name to URL-safe slug."""
     s = name.lower().strip()
     s = re.sub(r'[^a-z0-9]+', '-', s)
     s = s.strip('-')
     return s
+
+def to_webp_url(url: str) -> str:
+    """Point a JPG/PNG asset URL at its WebP twin."""
+    return re.sub(r'\.(jpe?g|png)$', '.webp', url, flags=re.IGNORECASE)
+
+def scale_filter(resolution: str) -> str:
+    """Build an ffmpeg scale filter from '1440' (width, aspect preserved) or '1920x1080'."""
+    r = resolution.strip().lower()
+    if "x" in r:
+        return f"scale={r.replace('x', ':')}"
+    return f"scale={r}:-2"
+
+def has_faststart(path) -> bool:
+    """Return True if the MP4's moov atom precedes its mdat atom (progressive playback)."""
+    order = []
+    try:
+        with open(path, 'rb') as f:
+            while True:
+                hdr = f.read(8)
+                if len(hdr) < 8:
+                    break
+                size = struct.unpack('>I', hdr[:4])[0]
+                order.append(hdr[4:8].decode('latin1', 'replace'))
+                if size == 1:
+                    size = struct.unpack('>Q', f.read(8))[0]
+                    f.seek(size - 16, 1)
+                elif size == 0:
+                    break
+                else:
+                    f.seek(size - 8, 1)
+    except OSError:
+        return False
+    return 'moov' in order and 'mdat' in order and order.index('moov') < order.index('mdat')
+
+def source_has_alpha(source: str) -> bool:
+    """Probe a source image/video for an alpha-carrying pixel format."""
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=pix_fmt",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        str(source),
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    except subprocess.SubprocessError:
+        return False
+    if result.returncode != 0:
+        return False
+    pix_fmt = result.stdout.strip().lower()
+    return any(fmt in pix_fmt for fmt in ALPHA_PIX_FMTS)
 
 def parse_folder_name(folder: str):
     """Extract (from_name, to_name) from folder like 'Air Filtration Index_to_Habitat'."""
@@ -91,8 +148,8 @@ def discover_views_and_transitions(source_dir: Path, use_mp4: bool = False):
     views = sorted(views)
     return views, transitions
 
-def copy_mp4_transition(t: dict, output_dir: Path) -> dict:
-    """Copy an existing MP4 transition video."""
+def encode_mp4_transition(t: dict, resolution: str, crf: int, output_dir: Path) -> dict:
+    """Re-encode an existing MP4 transition for web delivery (scaled, CRF, faststart)."""
     from_slug = slugify(t["from_name"])
     to_slug = slugify(t["to_name"])
     filename = f"{from_slug}_to_{to_slug}.mp4"
@@ -100,14 +157,41 @@ def copy_mp4_transition(t: dict, output_dir: Path) -> dict:
 
     if out_path.exists():
         size_mb = out_path.stat().st_size / (1024 * 1024)
+        if not has_faststart(out_path):
+            return {
+                "file": filename,
+                "size_mb": size_mb,
+                "status": "error",
+                "error": "existing file has moov after mdat (delete it to re-encode with +faststart)",
+            }
         return {"file": filename, "size_mb": size_mb, "status": "exists"}
 
-    try:
-        shutil.copy2(t["mp4_path"], out_path)
-        size_mb = out_path.stat().st_size / (1024 * 1024)
-        return {"file": filename, "size_mb": size_mb, "status": "ok"}
-    except Exception as e:
-        return {"file": filename, "status": "error", "error": str(e)}
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", t["mp4_path"],
+        "-vf", scale_filter(resolution),
+        "-c:v", "libx264",
+        "-preset", "slow",
+        "-crf", str(crf),
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        "-an",
+        str(out_path),
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if result.returncode != 0:
+        return {"file": filename, "status": "error", "error": result.stderr[-500:]}
+
+    size_mb = out_path.stat().st_size / (1024 * 1024)
+    if not has_faststart(out_path):
+        return {
+            "file": filename,
+            "size_mb": size_mb,
+            "status": "error",
+            "error": "faststart verification failed (moov atom is not before mdat)",
+        }
+    return {"file": filename, "size_mb": size_mb, "status": "ok"}
 
 def encode_transition(t: dict, resolution: str, crf: int, fps: int, output_dir: Path) -> dict:
     """Encode a single transition folder → MP4."""
@@ -118,6 +202,13 @@ def encode_transition(t: dict, resolution: str, crf: int, fps: int, output_dir: 
 
     if out_path.exists():
         size_mb = out_path.stat().st_size / (1024 * 1024)
+        if not has_faststart(out_path):
+            return {
+                "file": filename,
+                "size_mb": size_mb,
+                "status": "error",
+                "error": "existing file has moov after mdat (delete it to re-encode with +faststart)",
+            }
         return {"file": filename, "size_mb": size_mb, "status": "exists"}
 
     frames_dir = t["frames_dir"]
@@ -127,9 +218,9 @@ def encode_transition(t: dict, resolution: str, crf: int, fps: int, output_dir: 
         "ffmpeg", "-y",
         "-framerate", str(fps),
         "-i", input_pattern,
-        "-vf", f"scale={resolution.replace('x', ':')}",
+        "-vf", scale_filter(resolution),
         "-c:v", "libx264",
-        "-preset", "medium",
+        "-preset", "slow",
         "-crf", str(crf),
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
@@ -137,20 +228,57 @@ def encode_transition(t: dict, resolution: str, crf: int, fps: int, output_dir: 
         str(out_path),
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     if result.returncode != 0:
         return {"file": filename, "status": "error", "error": result.stderr[-500:]}
 
     size_mb = out_path.stat().st_size / (1024 * 1024)
+    if not has_faststart(out_path):
+        return {
+            "file": filename,
+            "size_mb": size_mb,
+            "status": "error",
+            "error": "faststart verification failed (moov atom is not before mdat)",
+        }
     return {"file": filename, "size_mb": size_mb, "status": "ok"}
 
-def extract_view_image_from_mp4(view_name: str, transitions: list, output_dir: Path, project_slug: str) -> str | None:
+def encode_webp(input_args: list, out_path: Path, quality: int, width, alpha: bool) -> bool:
+    """Encode one frame from an ffmpeg input to WebP, optionally scaled to a target width."""
+    cmd = ["ffmpeg", "-y"] + input_args
+    if width:
+        cmd += ["-vf", f"scale={width}:-2"]
+    cmd += ["-c:v", "libwebp", "-quality", str(quality)]
+    if alpha:
+        cmd += ["-pix_fmt", "yuva420p"]
+    cmd += ["-frames:v", "1", str(out_path)]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    return result.returncode == 0
+
+def write_view_images(input_args: list, source: str, slug: str, output_dir: Path, project_slug: str):
+    """Write the full-res WebP still + carousel thumbnail for one view."""
+    full_path = output_dir / "views" / f"{slug}.webp"
+    thumb_path = output_dir / "views" / f"{slug}-thumb.webp"
+    urls = {
+        "imageUrl": f"/assets/projects/{project_slug}/views/{slug}.webp",
+        "thumbUrl": f"/assets/projects/{project_slug}/views/{slug}-thumb.webp",
+    }
+
+    if full_path.exists() and thumb_path.exists():
+        return urls
+
+    alpha = source_has_alpha(source)
+    if not full_path.exists():
+        if not encode_webp(input_args, full_path, WEBP_QUALITY, None, alpha):
+            return None
+    if not thumb_path.exists():
+        if not encode_webp(input_args, thumb_path, THUMB_QUALITY, THUMB_WIDTH, alpha):
+            return None
+    return urls
+
+def extract_view_image_from_mp4(view_name: str, transitions: list, output_dir: Path, project_slug: str):
     """Extract last frame from an incoming transition as the static view image (Cesium fully loaded)."""
     slug = slugify(view_name)
-    out_path = output_dir / "views" / f"{slug}.jpg"
-
-    if out_path.exists():
-        return f"/assets/projects/{project_slug}/views/{slug}.jpg"
 
     # Use last frame of a transition TO this view (arrival = fully loaded)
     for t in transitions:
@@ -161,66 +289,60 @@ def extract_view_image_from_mp4(view_name: str, transitions: list, output_dir: P
             if frames_dir.is_dir():
                 frames = sorted(frames_dir.glob("frame_*.png"))
                 if frames:
-                    cmd = [
-                        "ffmpeg", "-y",
-                        "-i", str(frames[-1]),
-                        "-q:v", "2",
-                        str(out_path),
-                    ]
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-                    if result.returncode == 0:
-                        return f"/assets/projects/{project_slug}/views/{slug}.jpg"
+                    urls = write_view_images(
+                        ["-i", str(frames[-1])], str(frames[-1]), slug, output_dir, project_slug
+                    )
+                    if urls:
+                        return urls
 
             # Fallback: last frame from MP4
-            cmd = [
-                "ffmpeg", "-y",
-                "-sseof", "-0.1",
-                "-i", t["mp4_path"],
-                "-vframes", "1",
-                "-q:v", "2",
-                str(out_path),
-            ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode == 0:
-                return f"/assets/projects/{project_slug}/views/{slug}.jpg"
+            urls = write_view_images(
+                ["-sseof", "-0.1", "-i", t["mp4_path"]], t["mp4_path"], slug, output_dir, project_slug
+            )
+            if urls:
+                return urls
     return None
 
-def extract_view_image_from_frames(view_name: str, transitions: list, resolution: str, output_dir: Path, project_slug: str) -> str | None:
+def extract_view_image_from_frames(view_name: str, transitions: list, output_dir: Path, project_slug: str):
     """Extract first frame from PNG sequence as the static view image."""
     slug = slugify(view_name)
-    out_path = output_dir / "views" / f"{slug}.jpg"
-
-    if out_path.exists():
-        return f"/assets/projects/{project_slug}/views/{slug}.jpg"
 
     for t in transitions:
         if t["from_name"] == view_name:
             frames_dir = t["frames_dir"]
             first_frame = os.path.join(frames_dir, "frame_000000.png")
             if os.path.exists(first_frame):
-                cmd = [
-                    "ffmpeg", "-y",
-                    "-i", first_frame,
-                    "-vf", f"scale={resolution.replace('x', ':')}",
-                    "-q:v", "2",
-                    str(out_path),
-                ]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-                if result.returncode == 0:
-                    return f"/assets/projects/{project_slug}/views/{slug}.jpg"
+                urls = write_view_images(
+                    ["-i", first_frame], first_frame, slug, output_dir, project_slug
+                )
+                if urls:
+                    return urls
     return None
 
-def generate_config(views: list, transitions: list, view_images: dict, project_slug: str, project_name: str) -> dict:
-    """Generate ProjectConfig JSON."""
+def generate_config(views: list, transitions: list, view_images: dict, project_slug: str,
+                    project_name: str, existing: dict | None = None) -> dict:
+    """Generate ProjectConfig JSON (see src/types.ts)."""
+    existing = existing or {}
+    existing_views = {v.get("name"): v for v in existing.get("views", [])}
+
     view_nodes = []
     view_id_map = {}
     for i, name in enumerate(views, start=1):
         view_id_map[name] = i
-        view_nodes.append({
+        images = view_images.get(name, {})
+        node = {
             "id": i,
             "name": name,
-            "imageUrl": view_images.get(name, ""),
-        })
+            "imageUrl": images.get("imageUrl", ""),
+            "thumbUrl": images.get("thumbUrl", ""),
+        }
+        alternates = [
+            {"name": alt.get("name", ""), "imageUrl": to_webp_url(alt.get("imageUrl", ""))}
+            for alt in existing_views.get(name, {}).get("alternateLayers", [])
+        ]
+        if alternates:
+            node["alternateLayers"] = alternates
+        view_nodes.append(node)
 
     transition_list = []
     for t in transitions:
@@ -241,7 +363,7 @@ def generate_config(views: list, transitions: list, view_images: dict, project_s
         "projectName": project_name,
         "views": view_nodes,
         "transitions": transition_list,
-        "locations": [],
+        "locations": existing.get("locations", []),
         "metadata": {
             "description": f"{project_name} - {len(views)} views with full transition coverage",
             "viewCount": len(views),
@@ -281,11 +403,11 @@ def main():
     parser.add_argument("--project", required=True, help="Project slug (e.g. maui-busway)")
     parser.add_argument("--name", default=None, help="Project display name (defaults to slug)")
     parser.add_argument("--source", default=None, help="Source directory (default: Perforce VideoCaptures)")
-    parser.add_argument("--resolution", default="1920x1080", help="Output resolution (default: 1920x1080)")
+    parser.add_argument("--resolution", default="1440", help="Video target width, or WxH (default: 1440, aspect preserved)")
     parser.add_argument("--crf", type=int, default=26, help="H.264 CRF quality (default: 26, lower=better)")
     parser.add_argument("--fps", type=int, default=30, help="Frame rate (default: 30)")
     parser.add_argument("--workers", type=int, default=4, help="Parallel encoding threads (default: 4)")
-    parser.add_argument("--use-mp4", action="store_true", help="Copy existing MP4s instead of re-encoding from frames")
+    parser.add_argument("--use-mp4", action="store_true", help="Re-encode existing MP4s instead of encoding from frames")
     parser.add_argument("--set-active", action="store_true", help="Set this project as the active (demo) project")
     args = parser.parse_args()
 
@@ -299,10 +421,12 @@ def main():
     print(f"Source:  {source_dir}")
     print(f"Output:  {OUTPUT_DIR}")
     if args.use_mp4:
-        print(f"Mode: Copy existing MP4s (native resolution)")
+        print(f"Mode: Re-encode existing MP4s")
+        print(f"Resolution: {args.resolution}, CRF: {args.crf}")
     else:
         print(f"Mode: Encode from frames")
         print(f"Resolution: {args.resolution}, CRF: {args.crf}, FPS: {args.fps}")
+    print(f"Stills: WebP q{WEBP_QUALITY} + {THUMB_WIDTH}px thumbs q{THUMB_QUALITY}")
     print()
 
     # Create output directories
@@ -321,65 +445,67 @@ def main():
     view_images = {}
     for name in views:
         if args.use_mp4:
-            url = extract_view_image_from_mp4(name, transitions, OUTPUT_DIR, project_slug)
+            urls = extract_view_image_from_mp4(name, transitions, OUTPUT_DIR, project_slug)
         else:
-            url = extract_view_image_from_frames(name, transitions, args.resolution, OUTPUT_DIR, project_slug)
-        if url:
-            view_images[name] = url
+            urls = extract_view_image_from_frames(name, transitions, OUTPUT_DIR, project_slug)
+        if urls:
+            view_images[name] = urls
             print(f"  [OK] {name}")
         else:
             print(f"  [FAIL] {name} (no source found)")
     print()
 
     # Process transitions
-    if args.use_mp4:
-        print(f"Copying {len(transitions)} MP4 transitions...")
-        results = []
-        for i, t in enumerate(transitions, 1):
-            result = copy_mp4_transition(t, OUTPUT_DIR)
+    verb = "Re-encoding" if args.use_mp4 else "Encoding"
+    print(f"{verb} {len(transitions)} transitions ({args.workers} workers)...")
+    results = []
+    completed = 0
+
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:
+        if args.use_mp4:
+            futures = {
+                pool.submit(encode_mp4_transition, t, args.resolution, args.crf, OUTPUT_DIR): t
+                for t in transitions
+            }
+        else:
+            futures = {
+                pool.submit(encode_transition, t, args.resolution, args.crf, args.fps, OUTPUT_DIR): t
+                for t in transitions
+            }
+        for future in as_completed(futures):
+            t = futures[future]
+            completed += 1
+            result = future.result()
             results.append(result)
             status = result["status"]
             size = f"{result.get('size_mb', 0):.1f}MB" if "size_mb" in result else ""
             prefix = "[OK]" if status in ("ok", "exists") else "[FAIL]"
             tag = " (cached)" if status == "exists" else ""
-            print(f"  [{i}/{len(transitions)}] {prefix} {result['file']} {size}{tag}")
+            print(f"  [{completed}/{len(transitions)}] {prefix} {result['file']} {size}{tag}")
             if status == "error":
                 print(f"      Error: {result.get('error', '')[:200]}")
-    else:
-        print(f"Encoding {len(transitions)} transitions ({args.workers} workers)...")
-        results = []
-        completed = 0
-
-        with ThreadPoolExecutor(max_workers=args.workers) as pool:
-            futures = {
-                pool.submit(encode_transition, t, args.resolution, args.crf, args.fps, OUTPUT_DIR): t
-                for t in transitions
-            }
-            for future in as_completed(futures):
-                t = futures[future]
-                completed += 1
-                result = future.result()
-                results.append(result)
-                status = result["status"]
-                size = f"{result.get('size_mb', 0):.1f}MB" if "size_mb" in result else ""
-                prefix = "[OK]" if status in ("ok", "exists") else "[FAIL]"
-                tag = " (cached)" if status == "exists" else ""
-                print(f"  [{completed}/{len(transitions)}] {prefix} {result['file']} {size}{tag}")
-                if status == "error":
-                    print(f"      Error: {result.get('error', '')[:200]}")
 
     # Stats
     ok_results = [r for r in results if r["status"] in ("ok", "exists")]
+    failed = [r for r in results if r["status"] == "error"]
     total_size = sum(r.get("size_mb", 0) for r in ok_results)
     print()
     print(f"=== Results ===")
     print(f"  Processed: {len(ok_results)}/{len(transitions)}")
     print(f"  Total size: {total_size:.1f} MB")
     print(f"  Avg per video: {total_size/max(len(ok_results),1):.1f} MB")
+    if failed:
+        print(f"  Failed: {len(failed)}")
+        for r in failed:
+            print(f"    - {r['file']}: {r.get('error', '')[:200]}")
 
     # Generate config
-    config = generate_config(views, transitions, view_images, project_slug, project_name)
     config_path = OUTPUT_DIR / "config.json"
+    existing_config = None
+    if config_path.exists():
+        with open(config_path) as f:
+            existing_config = json.load(f)
+    config = generate_config(views, transitions, view_images, project_slug, project_name, existing_config)
     with open(config_path, "w") as f:
         json.dump(config, f, indent=2)
     print(f"  Config: {config_path}")

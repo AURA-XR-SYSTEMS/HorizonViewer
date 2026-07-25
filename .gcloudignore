@@ -1,0 +1,14 @@
+# Cloud Build upload rules.
+#
+# This file must exist. Without it gcloud synthesizes one from .gitignore,
+# which excludes public/assets/projects/ and ships a viewer with no data.
+
+.git
+.gitignore
+node_modules
+dist
+*.log
+.env
+.env.local
+.DS_Store
+Thumbs.db
