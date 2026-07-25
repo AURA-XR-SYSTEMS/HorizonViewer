@@ -5,6 +5,13 @@ import { ExportNotReadyError } from './lib/bootstrapClient';
 import { ProjectConfig } from './types';
 import AuraViewer from './AuraViewer';
 import LandingPage from './LandingPage';
+import AdminExportPanel from './AdminExportPanel';
+
+/** Build-time debug surface; never enabled in a client build. */
+function isAdminPanelEnabled(): boolean {
+  const value = import.meta.env.VITE_HORIZON_ENABLE_ADMIN_PANEL?.trim().toLowerCase();
+  return value === '1' || value === 'true' || value === 'yes';
+}
 
 /**
  * Resolves what to show from the URL, then loads it.
@@ -48,12 +55,14 @@ const App: React.FC = () => {
     };
   }, [source]);
 
-  if (source.kind === 'none') {
-    return <LandingPage />;
-  }
+  // Computed rather than returned early so the admin panel can overlay every
+  // state, including the landing page and load failures.
+  let content: React.ReactNode;
 
-  if (loading) {
-    return (
+  if (source.kind === 'none') {
+    content = <LandingPage />;
+  } else if (loading) {
+    content = (
       <div className="w-full h-full flex items-center justify-center bg-slate-900">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin" />
@@ -61,10 +70,8 @@ const App: React.FC = () => {
         </div>
       </div>
     );
-  }
-
-  if (error || !config) {
-    return (
+  } else if (error || !config) {
+    content = (
       <div className="w-full h-full flex items-center justify-center bg-slate-900">
         <div className="flex flex-col items-center gap-4 text-center px-8">
           <div
@@ -83,9 +90,20 @@ const App: React.FC = () => {
         </div>
       </div>
     );
+  } else {
+    content = <AuraViewer config={config} />;
   }
 
-  return <AuraViewer config={config} />;
+  return (
+    <div className="relative w-full h-full">
+      {content}
+      {isAdminPanelEnabled() ? (
+        <AdminExportPanel
+          defaultWorkspaceId={import.meta.env.VITE_HORIZON_ADMIN_DEFAULT_WORKSPACE_ID ?? ''}
+        />
+      ) : null}
+    </div>
+  );
 };
 
 export default App;

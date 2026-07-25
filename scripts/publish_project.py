@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -108,18 +109,56 @@ def build_zip(slug: str, config: dict, assets: dict[str, str]) -> bytes:
     return buffer.getvalue()
 
 
-def post_json(url: str, payload: dict) -> dict:
+def resolve_token(api: str) -> str:
+    """Get an AURA account token for the write endpoints.
+
+    Write endpoints require an account, so this script needs one too. Credentials
+    are read from the environment and never passed on the command line, where they
+    would land in shell history and process listings.
+
+        HORIZON_TOKEN                     an existing token, used as-is
+        HORIZON_EMAIL / HORIZON_PASSWORD  exchanged for a token via /auth/login
+
+    Put them in a local .env you do not commit, or export them for the session.
+    """
+    token = os.environ.get("HORIZON_TOKEN", "").strip()
+    if token:
+        return token
+
+    email = os.environ.get("HORIZON_EMAIL", "").strip()
+    password = os.environ.get("HORIZON_PASSWORD", "")
+    if not email or not password:
+        raise SystemExit(
+            "Publishing requires an AURA account.\n"
+            "Set HORIZON_TOKEN, or HORIZON_EMAIL and HORIZON_PASSWORD, in your environment."
+        )
+
+    try:
+        payload = post_json(f"{api}/auth/login", {"email": email, "password": password})
+    except urllib.error.HTTPError as error:
+        raise SystemExit(f"Login failed: {describe_http_error(error)}") from error
+
+    token = payload.get("accessToken") or payload.get("access_token") or ""
+    if not token:
+        raise SystemExit("Login succeeded but no token was returned.")
+    return token
+
+
+def post_json(url: str, payload: dict, token: str | None = None) -> dict:
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
-def post_multipart_zip(url: str, zip_bytes: bytes, filename: str) -> dict:
+def post_multipart_zip(url: str, zip_bytes: bytes, filename: str, token: str | None = None) -> dict:
     boundary = f"----horizon{uuid.uuid4().hex}"
     body = b"".join(
         [
@@ -130,12 +169,10 @@ def post_multipart_zip(url: str, zip_bytes: bytes, filename: str) -> dict:
             f"\r\n--{boundary}--\r\n".encode(),
         ]
     )
-    request = urllib.request.Request(
-        url,
-        data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-        method="POST",
-    )
+    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
     # Large archives over a cold ALB connection need generous headroom.
     with urllib.request.urlopen(request, timeout=900) as response:
         return json.loads(response.read().decode("utf-8"))
@@ -183,10 +220,11 @@ def main() -> int:
 
     api = args.api.rstrip("/")
     export_id = args.export_id or args.slug
+    token = resolve_token(api)
 
     try:
         created = post_json(
-            f"{api}/api/exports/{args.workspace_id}/new", {"exportId": export_id}
+            f"{api}/api/exports/{args.workspace_id}/new", {"exportId": export_id}, token
         )
         print(f"created export job {created['exportId']} ({created['status']})")
     except urllib.error.HTTPError as error:
@@ -201,6 +239,7 @@ def main() -> int:
             f"{api}/api/exports/{args.workspace_id}/{export_id}/upload",
             zip_bytes,
             f"{args.slug}.zip",
+            token,
         )
     except urllib.error.HTTPError as error:
         print(f"upload failed: {describe_http_error(error)}", file=sys.stderr)

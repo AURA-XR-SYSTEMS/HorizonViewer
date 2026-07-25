@@ -395,9 +395,17 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
             className="w-full flex items-center rounded-2xl transition-all duration-300"
             style={{ ...headerGlass, height: expanded ? 52 : 0, opacity: expanded ? 1 : 0, overflow: 'hidden', padding: expanded ? '0 16px' : '0' }}
           >
-            {/* Left — logo */}
+            {/* Left — logo. The lockup already carries the AURA wordmark, so only
+                HORIZON is set in type beside it. Height is capped rather than the
+                width so the mark keeps its baseline relationship to the text. */}
             <div className="flex items-center gap-2 flex-shrink-0" style={{ minWidth: 140 }}>
-              <span className="text-base tracking-widest font-semibold select-none" style={{ color: 'rgba(25,25,25,0.75)', letterSpacing: '0.15em' }}>AURA</span>
+              <img
+                src="/assets/aura-logo.png"
+                alt="AURA"
+                draggable={false}
+                className="select-none"
+                style={{ height: 22, width: 'auto', display: 'block' }}
+              />
               <span className="text-base tracking-wider font-light select-none" style={{ color: 'rgba(25,25,25,0.4)', letterSpacing: '0.1em' }}>HORIZON</span>
             </div>
 
