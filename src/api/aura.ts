@@ -1,38 +1,47 @@
 import { ProjectConfig } from '../types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+import { fetchExportConfig } from '../lib/bootstrapClient';
+import type { ProjectSource } from '../lib/projectSource';
 
 /**
- * Fetches project configuration.
- * 'demo' loads the active project from /assets/active-project.json.
- * Named keys load from /assets/projects/{key}/config.json.
- * Falls back to the real API for unknown keys.
+ * Loads a bundled project shipped with the viewer.
+ *
+ * 'demo' resolves through /assets/active-project.json so the demo target can be
+ * switched without a rebuild. Used for local dev and offline client demos;
+ * shared links go through HorizonServer instead.
  */
-export async function fetchProject(auraKey: string): Promise<ProjectConfig> {
-  // "demo" resolves to the active project
-  if (auraKey === 'demo') {
+export async function fetchStaticProject(auraKey: string): Promise<ProjectConfig> {
+  let resolvedKey = auraKey;
+
+  if (resolvedKey === 'demo') {
     const activeRes = await fetch('/assets/active-project.json');
     if (activeRes.ok) {
       const { activeProject } = await activeRes.json();
-      auraKey = activeProject;
+      resolvedKey = activeProject;
     } else {
-      auraKey = 'horizon-metro'; // fallback
+      resolvedKey = 'horizon-metro';
     }
   }
 
-  // Try loading from local projects folder
-  const localRes = await fetch(`/assets/projects/${auraKey}/config.json`);
-  if (localRes.ok) return localRes.json();
-
-  // Fall back to real API
-  const response = await fetch(`${API_BASE_URL}/projects/${auraKey}`);
-  if (!response.ok) throw new Error('Failed to fetch project');
-  return response.json();
+  const localRes = await fetch(`/assets/projects/${resolvedKey}/config.json`);
+  if (!localRes.ok) {
+    throw new Error(`No bundled project named "${resolvedKey}".`);
+  }
+  return localRes.json();
 }
 
-/**
- * Fetches the list of available local projects.
- */
+/** Loads whichever source the URL resolved to. */
+export async function fetchProjectForSource(source: ProjectSource): Promise<ProjectConfig> {
+  switch (source.kind) {
+    case 'export':
+      return fetchExportConfig(source.exportId);
+    case 'static':
+      return fetchStaticProject(source.auraKey);
+    case 'none':
+      throw new Error('No project specified.');
+  }
+}
+
+/** Lists bundled projects, if an index was shipped. */
 export async function listProjects(): Promise<{ id: string; name: string }[]> {
   const res = await fetch('/assets/projects/index.json');
   if (!res.ok) return [];
