@@ -1,0 +1,116 @@
+# Deploys the built viewer to the S3 + CloudFront stack defined in
+# aura-aws-infra/cloud/static-site/horizonviewer.
+#
+# Requires these GitHub environment variables on the target environment:
+#   AWS_ROLE_TO_ASSUME        OIDC role this workflow assumes
+#   AWS_REGION                us-east-1
+#   VIEWER_BUCKET             terraform output -raw bucket_name
+#   VIEWER_DISTRIBUTION_ID    terraform output -raw distribution_id
+#   VITE_HORIZON_API_BASE_URL https://api.horizon-dev.aura-infra.com
+#
+# The OIDC role is NOT created by the Terraform module: PowerUserAccess cannot
+# write IAM, so it has to be added by someone with IAM permissions. It needs
+# s3:ListBucket + s3:PutObject + s3:DeleteObject on the bucket, and
+# cloudfront:CreateInvalidation on the distribution.
+
+name: Deploy Viewer
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - prod
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-viewer-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate environment configuration
+        run: |
+          set -euo pipefail
+          for name in AWS_ROLE_TO_ASSUME AWS_REGION VIEWER_BUCKET VIEWER_DISTRIBUTION_ID VITE_HORIZON_API_BASE_URL; do
+            case "$name" in
+              AWS_ROLE_TO_ASSUME)        value='${{ vars.AWS_ROLE_TO_ASSUME }}' ;;
+              AWS_REGION)                value='${{ vars.AWS_REGION }}' ;;
+              VIEWER_BUCKET)             value='${{ vars.VIEWER_BUCKET }}' ;;
+              VIEWER_DISTRIBUTION_ID)    value='${{ vars.VIEWER_DISTRIBUTION_ID }}' ;;
+              VITE_HORIZON_API_BASE_URL) value='${{ vars.VITE_HORIZON_API_BASE_URL }}' ;;
+            esac
+            if [ -z "$value" ]; then
+              echo "Missing GitHub environment variable: $name" >&2
+              exit 1
+            fi
+          done
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          VITE_HORIZON_API_BASE_URL: ${{ vars.VITE_HORIZON_API_BASE_URL }}
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+
+      # Hashed assets first, so a client that fetches the new index.html can
+      # always resolve the bundles it references. Uploading index.html first
+      # would leave a window where it points at objects that do not exist yet.
+      #
+      # Cache-Control here is what the browser obeys. The CloudFront cache policy
+      # only governs CloudFront's own cache, so stamping immutable on everything
+      # would pin bundled project configs in browsers for a year regardless of
+      # what the distribution says.
+      - name: Upload hashed assets
+        run: |
+          aws s3 sync dist/ "s3://${{ vars.VIEWER_BUCKET }}/" \
+            --exclude "index.html" \
+            --exclude "assets/projects/*" \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Upload bundled project configs
+        run: |
+          aws s3 sync dist/ "s3://${{ vars.VIEWER_BUCKET }}/" \
+            --exclude "*" \
+            --include "assets/projects/*" \
+            --cache-control "public, max-age=300, must-revalidate"
+
+      - name: Upload entry point
+        run: |
+          aws s3 sync dist/ "s3://${{ vars.VIEWER_BUCKET }}/" \
+            --delete \
+            --exclude "*" \
+            --include "index.html" \
+            --cache-control "no-cache"
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.VIEWER_DISTRIBUTION_ID }}" \
+            --paths '/*'
