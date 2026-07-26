@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { listMyExports } from './lib/exportAdminApi';
+import { deleteExport, listMyExports } from './lib/exportAdminApi';
 import type { OwnedExportSummary } from './lib/apiSchemas';
 import type { Session } from './lib/useSession';
 
@@ -76,6 +76,9 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exports, setExports] = useState<OwnedExportSummary[] | null>(null);
+  // Deleting is irreversible, so a row must be armed before it will go.
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Dismiss on an outside click, matching the other header popovers.
@@ -136,7 +139,22 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
   const handleSignOut = () => {
     signOut();
     setExports(null);
+    setConfirmingDelete(null);
     setOpen(false);
+  };
+
+  const handleDelete = async (exportId: string) => {
+    setDeleting(exportId);
+    setError(null);
+    try {
+      await deleteExport(exportId);
+      setExports((rows) => (rows ?? []).filter((row) => row.exportId !== exportId));
+      setConfirmingDelete(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete that scene.');
+    } finally {
+      setDeleting(null);
+    }
   };
 
   return (
@@ -221,41 +239,127 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                   >
                     {exports.map((row) => {
                       const isCurrent = row.exportId === currentExportId;
+                      const isConfirming = confirmingDelete === row.exportId;
+                      const isDeleting = deleting === row.exportId;
+
+                      if (isConfirming) {
+                        return (
+                          <div
+                            key={row.exportId}
+                            className="rounded-md"
+                            style={{ padding: '6px 7px', background: 'rgba(220,38,38,0.08)' }}
+                          >
+                            <div style={{ fontSize: 11, color: 'rgba(25,25,25,0.7)' }}>
+                              Delete permanently? Any shared link stops working.
+                            </div>
+                            <div className="flex gap-1" style={{ marginTop: 6 }}>
+                              <button
+                                onClick={() => handleDelete(row.exportId)}
+                                disabled={isDeleting}
+                                className="rounded-md"
+                                style={{
+                                  flex: 1,
+                                  height: 26,
+                                  fontSize: 11,
+                                  color: 'white',
+                                  background: isDeleting ? 'rgba(220,38,38,0.5)' : '#dc2626',
+                                }}
+                              >
+                                {isDeleting ? 'Deleting…' : 'Delete'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmingDelete(null)}
+                                disabled={isDeleting}
+                                className="rounded-md hover:bg-black/10"
+                                style={{
+                                  flex: 1,
+                                  height: 26,
+                                  fontSize: 11,
+                                  color: 'rgba(25,25,25,0.7)',
+                                  border: '1px solid rgba(25,25,25,0.15)',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       return (
-                        <a
+                        <div
                           key={row.exportId}
-                          href={`/${row.exportId}`}
-                          className="rounded-md hover:bg-black/5"
+                          className="group flex items-center rounded-md hover:bg-black/5"
                           style={{
-                            display: 'block',
                             padding: '5px 7px',
-                            fontSize: 12,
-                            color: 'rgba(25,25,25,0.8)',
-                            textDecoration: 'none',
+                            gap: 6,
                             background: isCurrent ? 'rgba(0,0,0,0.05)' : 'transparent',
                           }}
                         >
-                          <span
+                          <a
+                            href={`/${row.exportId}`}
                             style={{
-                              display: 'block',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
+                              flex: 1,
+                              minWidth: 0,
+                              fontSize: 12,
+                              color: 'rgba(25,25,25,0.8)',
+                              textDecoration: 'none',
                             }}
                           >
-                            {row.projectName || row.exportId}
-                          </span>
-                          {row.status !== 'ready' && (
-                            <span style={{ fontSize: 10, color: 'rgba(25,25,25,0.45)' }}>
-                              {row.status}
+                            <span
+                              style={{
+                                display: 'block',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {row.projectName || row.exportId}
                             </span>
-                          )}
-                        </a>
+                            {row.status !== 'ready' && (
+                              <span style={{ fontSize: 10, color: 'rgba(25,25,25,0.45)' }}>
+                                {row.status}
+                              </span>
+                            )}
+                          </a>
+                          <button
+                            onClick={() => setConfirmingDelete(row.exportId)}
+                            title="Delete scene"
+                            aria-label={`Delete ${row.projectName || row.exportId}`}
+                            className="rounded opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red-600 transition-opacity"
+                            style={{
+                              flexShrink: 0,
+                              width: 22,
+                              height: 22,
+                              color: 'rgba(25,25,25,0.45)',
+                            }}
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{ margin: '0 auto' }}
+                            >
+                              <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+                            </svg>
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
                 )}
               </div>
+
+              {error && (
+                <div style={{ fontSize: 11, color: '#dc2626' }} role="alert">
+                  {error}
+                </div>
+              )}
 
               <button
                 onClick={handleSignOut}

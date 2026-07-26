@@ -81,6 +81,20 @@ export function saveLocations(exportId: string, locations: AuraLocation[]): Prom
   return putSlice(exportId, 'locations', locations);
 }
 
+/**
+ * Permanently delete an export and its published assets.
+ *
+ * Irreversible, and it breaks any link already shared for the scene — which is
+ * the point, since it is the only way to unpublish. Callers must confirm first.
+ */
+export async function deleteExport(exportId: string): Promise<void> {
+  const response = await fetch(
+    `${requireApiBaseUrl()}/api/exports/${encodeURIComponent(exportId)}`,
+    { method: 'DELETE', headers: authHeaders() }
+  );
+  if (!response.ok) await throwForStatus(response);
+}
+
 /** The signed-in account's exports, newest first. Empty when signed out. */
 export async function listMyExports(): Promise<OwnedExportSummary[]> {
   const response = await fetch(`${requireApiBaseUrl()}/api/exports/mine`, {
