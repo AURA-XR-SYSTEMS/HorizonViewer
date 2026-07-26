@@ -497,7 +497,11 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
   }, [currentViewId, handleTransition]);
 
   return (
-    <div className="relative w-full h-full bg-black overflow-hidden">
+    <div
+      data-testid="aura-viewer"
+      data-current-view={currentView?.name ?? ''}
+      className="relative w-full h-full bg-black overflow-hidden"
+    >
 
       {/* Layer 0: Static View Image (base) */}
       <div
