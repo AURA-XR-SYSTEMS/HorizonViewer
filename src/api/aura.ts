@@ -1,5 +1,5 @@
 import { ProjectConfig } from '../types';
-import { fetchExportConfig } from '../lib/bootstrapClient';
+import { fetchExportConfig, type LoadedProject } from '../lib/bootstrapClient';
 import type { ProjectSource } from '../lib/projectSource';
 
 /**
@@ -30,12 +30,14 @@ export async function fetchStaticProject(auraKey: string): Promise<ProjectConfig
 }
 
 /** Loads whichever source the URL resolved to. */
-export async function fetchProjectForSource(source: ProjectSource): Promise<ProjectConfig> {
+export async function fetchProjectForSource(source: ProjectSource): Promise<LoadedProject> {
   switch (source.kind) {
     case 'export':
       return fetchExportConfig(source.exportId);
     case 'static':
-      return fetchStaticProject(source.auraKey);
+      // Bundled projects ship with the viewer and have no server-side owner,
+      // so there is nothing to edit authoritatively.
+      return { config: await fetchStaticProject(source.auraKey), canEdit: false };
     case 'none':
       throw new Error('No project specified.');
   }

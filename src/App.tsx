@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { fetchProjectForSource } from './api/aura';
 import { resolveProjectSource } from './lib/projectSource';
 import { ExportNotReadyError } from './lib/bootstrapClient';
+import { useSession } from './lib/useSession';
 import { ProjectConfig } from './types';
 import AuraViewer from './AuraViewer';
 import LandingPage from './LandingPage';
@@ -21,21 +22,34 @@ function isAdminPanelEnabled(): boolean {
  */
 const App: React.FC = () => {
   const source = useMemo(() => resolveProjectSource(window.location), []);
+  const session = useSession();
 
   const [config, setConfig] = useState<ProjectConfig | null>(null);
+  const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(source.kind !== 'none');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
+  // Waiting for `restoring` matters: bootstrap decides canEdit from the token on
+  // the request, so loading before the stored session is rehydrated would tell
+  // an owner they cannot edit their own scene until they reloaded. Signing in or
+  // out re-runs this for the same reason.
+  const accountId = session.account?.userId ?? null;
+  const sessionSettled = !session.restoring;
+
   useEffect(() => {
-    if (source.kind === 'none') return;
+    if (source.kind === 'none' || !sessionSettled) return;
 
     let cancelled = false;
 
     (async () => {
       try {
-        const projectConfig = await fetchProjectForSource(source);
-        if (!cancelled) setConfig(projectConfig);
+        const project = await fetchProjectForSource(source);
+        if (cancelled) return;
+        setConfig(project.config);
+        setCanEdit(project.canEdit);
+        setError(null);
+        setPending(false);
       } catch (err) {
         if (cancelled) return;
         // A not-yet-ready export is a normal state during publishing, not a failure.
@@ -53,7 +67,7 @@ const App: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [source]);
+  }, [source, sessionSettled, accountId]);
 
   // Computed rather than returned early so the admin panel can overlay every
   // state, including the landing page and load failures.
@@ -91,7 +105,14 @@ const App: React.FC = () => {
       </div>
     );
   } else {
-    content = <AuraViewer config={config} />;
+    content = (
+      <AuraViewer
+        config={config}
+        session={session}
+        canEdit={canEdit}
+        currentExportId={source.kind === 'export' ? source.exportId : undefined}
+      />
+    );
   }
 
   return (

@@ -14,8 +14,12 @@ import type { ExportJobResponse } from './lib/exportJobSchemas';
  *
  * Ported from the Preact viewer. Enabled with VITE_HORIZON_ENABLE_ADMIN_PANEL;
  * it is a developer tool for exercising create -> upload -> poll against a
- * backend, not a client-facing surface, and it has no authentication of its own
- * because the endpoints it calls have none either.
+ * backend, not a client-facing surface.
+ *
+ * Create and upload now require an AURA account. This panel has no sign-in of
+ * its own — it reuses whatever session the Account menu holds, so sign in there
+ * first or every call comes back 401. Account-facing export management lives in
+ * that menu, not here.
  */
 
 const AUTO_POLL_INTERVAL_MS = 2000;

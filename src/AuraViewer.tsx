@@ -2,9 +2,14 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { ProjectConfig, AuraLocation, ViewNode } from './types';
 import AuraPin from './AuraPin';
 import ReviewTools from './ReviewTools';
+import type { Session } from './lib/useSession';
 
 interface AuraViewerProps {
   config: ProjectConfig;
+  session: Session;
+  /** Whether the signed-in account owns this scene, per the server. */
+  canEdit: boolean;
+  currentExportId?: string;
 }
 
 const MAX_CACHED_VIDEOS = 12;
@@ -69,7 +74,7 @@ const projectPin = (
   return { left: `${pixelX}px`, top: `${pixelY}px`, visible };
 };
 
-const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
+const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, currentExportId }) => {
   const { views, transitions, locations } = config;
 
   const [currentViewId, setCurrentViewId] = useState(views[0]?.id || 1);
@@ -721,6 +726,9 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config }) => {
         isTransitioning={isTransitioning}
         navExpanded={timelineExpanded}
         onNavToggle={() => setTimelineExpanded(prev => !prev)}
+        session={session}
+        canEdit={canEdit}
+        currentExportId={currentExportId}
       />
 
       {/* Layer 3: Video container (on top during transitions, pass-through when empty) */}

@@ -92,8 +92,23 @@ export const ViewerBootstrapResponseSchema = z.object({
   viewerUrl: z.string().nullable(),
   metadata: z.unknown().nullable(),
   config: ApiProjectConfigSchema,
+  // Whether the requesting account owns this export. Defaulted because a server
+  // predating ownership omits it; absent means "not editable", which is the
+  // safe reading.
+  canEdit: z.boolean().default(false),
+});
+
+export const OwnedExportSummarySchema = z.object({
+  exportId: z.string(),
+  workspaceId: z.string(),
+  status: z.enum(['created', 'processing', 'ready', 'failed']),
+  viewerUrl: z.string().nullable(),
+  projectName: z.string().nullish(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 export type ApiProjectConfig = z.infer<typeof ApiProjectConfigSchema>;
 export type ExportConfigEnvelope = z.infer<typeof ExportConfigEnvelopeSchema>;
 export type ViewerBootstrapResponse = z.infer<typeof ViewerBootstrapResponseSchema>;
+export type OwnedExportSummary = z.infer<typeof OwnedExportSummarySchema>;

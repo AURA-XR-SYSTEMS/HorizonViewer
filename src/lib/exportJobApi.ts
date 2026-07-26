@@ -1,3 +1,4 @@
+import { authHeaders } from './auth'
 import {
   CreateExportJobResponseSchema,
   ExportJobResponseSchema,
@@ -184,9 +185,11 @@ export async function createExportJob(
     summary: body,
   }
 
+  // Creating and uploading require an AURA account; the export is recorded
+  // against whoever the token identifies, and only they can edit it afterwards.
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body,
   })
   const { job, status, payload } = await expectCreateJobResponse(response)
@@ -225,8 +228,10 @@ export async function uploadExportZip(
       : `multipart/form-data with file=${file.name} (${file.type || 'unknown type'}, ${file.size} bytes)`,
   }
 
+  // No Content-Type: the browser must set the multipart boundary itself.
   const response = await fetch(url, {
     method: 'POST',
+    headers: { ...authHeaders() },
     body: formData,
   })
   const { job, status, payload } = await expectJobResponse(response)

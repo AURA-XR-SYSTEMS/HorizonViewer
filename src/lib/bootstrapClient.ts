@@ -1,6 +1,13 @@
 import type { ProjectConfig } from '../types';
 import { ViewerBootstrapResponseSchema } from './apiSchemas';
+import { authHeaders } from './auth';
 import { mapApiConfig } from './configMapper';
+
+export interface LoadedProject {
+  config: ProjectConfig;
+  /** True only when the signed-in account owns this export. */
+  canEdit: boolean;
+}
 
 /**
  * Loads a published export from HorizonServer.
@@ -25,7 +32,7 @@ export class ExportNotReadyError extends Error {
   }
 }
 
-export async function fetchExportConfig(exportId: string): Promise<ProjectConfig> {
+export async function fetchExportConfig(exportId: string): Promise<LoadedProject> {
   const apiBaseUrl = getApiBaseUrl();
   if (!apiBaseUrl) {
     throw new Error(
@@ -34,7 +41,9 @@ export async function fetchExportConfig(exportId: string): Promise<ProjectConfig
   }
 
   const url = `${apiBaseUrl}/api/viewer/bootstrap?exportId=${encodeURIComponent(exportId)}`;
-  const response = await fetch(url);
+  // Sent when signed in so the server can answer canEdit. The endpoint is
+  // public, so an absent or stale token still loads the scene read-only.
+  const response = await fetch(url, { headers: authHeaders() });
 
   if (!response.ok) {
     // The server explains itself in `detail`; surface that rather than a bare status.
@@ -63,5 +72,8 @@ export async function fetchExportConfig(exportId: string): Promise<ProjectConfig
     throw new Error('The server returned a project in an unexpected format.');
   }
 
-  return mapApiConfig(parsed.data.config, parsed.data.exportId);
+  return {
+    config: mapApiConfig(parsed.data.config, parsed.data.exportId),
+    canEdit: parsed.data.canEdit,
+  };
 }

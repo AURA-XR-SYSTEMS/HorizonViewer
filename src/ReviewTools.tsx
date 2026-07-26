@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import AccountMenu from './AccountMenu';
+import type { Session } from './lib/useSession';
 
 // --- Icons ---
 const PenIcon = () => (
@@ -89,9 +91,13 @@ interface ReviewToolsProps {
   isTransitioning: boolean;
   navExpanded: boolean;
   onNavToggle: () => void;
+  session: Session;
+  /** True when the signed-in account owns the open scene, per the server. */
+  canEdit: boolean;
+  currentExportId?: string;
 }
 
-const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, isTransitioning, navExpanded, onNavToggle }) => {
+const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, isTransitioning, navExpanded, onNavToggle, session, canEdit, currentExportId }) => {
   const [activeTool, setActiveTool] = useState<ReviewTool>('select');
   const [activeColor, setActiveColor] = useState('#ff3b30');
   const [strokeWidth, setStrokeWidth] = useState(4);
@@ -440,14 +446,25 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({ expanded, onToggle, viewId, i
               </button>
             </div>
 
-            {/* Right — placeholders */}
+            {/* Right — account */}
             <div className="flex items-center gap-1 flex-shrink-0" style={{ minWidth: 140, justifyContent: 'flex-end' }}>
-              <button title="Settings" className="flex items-center justify-center rounded-lg transition-all hover:bg-black/10" style={{ width: 34, height: 34, color: 'rgba(25,25,25,0.55)' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-              </button>
-              <button title="Account" className="flex items-center justify-center rounded-lg transition-all hover:bg-black/10" style={{ width: 34, height: 34, color: 'rgba(25,25,25,0.55)' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
-              </button>
+              {canEdit && (
+                <span
+                  title="You own this scene, so your changes are saved to it."
+                  className="rounded-full"
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    padding: '3px 8px',
+                    color: 'rgba(25,25,25,0.6)',
+                    border: '1px solid rgba(25,25,25,0.15)',
+                  }}
+                >
+                  Owner
+                </span>
+              )}
+              <AccountMenu session={session} currentExportId={currentExportId} />
             </div>
           </div>
 
