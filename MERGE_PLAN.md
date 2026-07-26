@@ -40,6 +40,7 @@ The viewer's `ProjectConfig` is a strict superset of the server's. Pydantic sile
 fields, so these must be added server-side or the merged viewer loses features.
 
 `app/models.py`
+
 - `AuraView` += `thumbUrl?`, `embed?` (`{type:'youtube360', videoId}`), `alternateLayers?`
 - `ProjectConfig` += `projectId?`, `projectName?`, `metadata?`
 - `AuraLocation` += `Coordinates?`, `Links?`
@@ -73,13 +74,13 @@ regression test asserting `https` when `X-Forwarded-Proto: https` is set.
 
 Port from `origin/main`, Preact → React 19:
 
-| From `origin/main` | To this repo | Notes |
-|---|---|---|
-| `src/lib/apiSchemas.ts` | `src/lib/apiSchemas.ts` | zod; extend for Phase 1 fields |
-| `src/lib/projectConfigApi.ts` | `src/lib/bootstrapClient.ts` | bootstrap fetch + validation |
-| `src/lib/exportJobApi.ts` + `exportJobSchemas.ts` | same paths | admin API client |
-| `src/components/AdminExportPanel.tsx` | `src/AdminExportPanel.tsx` | `preact/hooks` → `react` |
-| `src/components/ComingSoonLanding.tsx` | `src/ComingSoonLanding.tsx` | root with no id |
+| From `origin/main`                                | To this repo                 | Notes                          |
+| ------------------------------------------------- | ---------------------------- | ------------------------------ |
+| `src/lib/apiSchemas.ts`                           | `src/lib/apiSchemas.ts`      | zod; extend for Phase 1 fields |
+| `src/lib/projectConfigApi.ts`                     | `src/lib/bootstrapClient.ts` | bootstrap fetch + validation   |
+| `src/lib/exportJobApi.ts` + `exportJobSchemas.ts` | same paths                   | admin API client               |
+| `src/components/AdminExportPanel.tsx`             | `src/AdminExportPanel.tsx`   | `preact/hooks` → `react`       |
+| `src/components/ComingSoonLanding.tsx`            | `src/ComingSoonLanding.tsx`  | root with no id                |
 
 Add `zod`. Keep `AuraViewer.tsx` and `ReviewTools.tsx` unchanged — the optimization work is the
 asset we are protecting.
@@ -88,7 +89,7 @@ asset we are protecting.
 
 Single ordered resolver replacing the current static-only path:
 
-1. path segment `/<exportId>` → `GET {API}/api/viewer/bootstrap?exportId=<id>`  ← the target shape
+1. path segment `/<exportId>` → `GET {API}/api/viewer/bootstrap?exportId=<id>` ← the target shape
 2. `?exportId=<id>` → same (back-compat with main and existing `viewerUrl` values)
 3. `?key=<slug>` → static `/assets/projects/<slug>/config.json` (local dev / offline demo)
 4. no id → `ComingSoonLanding`
@@ -130,7 +131,8 @@ Branch from `origin/main`, merge this branch with `--allow-unrelated-histories`,
   — only after Phase 4 is verified live
 
 Repo conventions in main's `AGENTS.md` (branch `codex/<slug>`, PR to `main`, `npm run format:check`
-+ `npm run build` before responding) become the standard going forward.
+
+- `npm run build` before responding) become the standard going forward.
 
 Retire the GCP Cloud Run `aura-embed` service **last**, once `horizon.auraengine.com` is verified.
 Keep revision `aura-embed-00004-b6c` as the rollback anchor until then.

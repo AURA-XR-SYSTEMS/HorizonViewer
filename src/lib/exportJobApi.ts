@@ -1,101 +1,101 @@
-import { authHeaders } from './auth'
+import { authHeaders } from './auth';
 import {
   CreateExportJobResponseSchema,
   ExportJobResponseSchema,
   type CreateExportJobResponse,
   type ExportJobResponse,
-} from './exportJobSchemas'
+} from './exportJobSchemas';
 
 export interface DebugRequest {
-  method: 'POST' | 'GET'
-  url: string
-  summary: string
+  method: 'POST' | 'GET';
+  url: string;
+  summary: string;
 }
 
 export interface DebugResponse {
-  status: number
-  payload: unknown
+  status: number;
+  payload: unknown;
 }
 
 export interface ExportJobApiResult {
-  job: ExportJobResponse
-  debugRequest: DebugRequest
-  debugResponse: DebugResponse
+  job: ExportJobResponse;
+  debugRequest: DebugRequest;
+  debugResponse: DebugResponse;
 }
 
-export type UploadMetadataFormat = 'horizon' | 'unreal'
+export type UploadMetadataFormat = 'horizon' | 'unreal';
 
 export interface UploadMetadataLocation {
-  id: string
-  name: string
+  id: string;
+  name: string;
   viewPositions: Array<{
-    viewId: number
-    x: number
-    y: number
-  }>
+    viewId: number;
+    x: number;
+    y: number;
+  }>;
 }
 
 export interface UploadMetadataPayload {
-  projectName?: string
-  sourceApplication?: string
-  sourceVersion?: string
+  projectName?: string;
+  sourceApplication?: string;
+  sourceVersion?: string;
   views: Array<{
-    id: number
-    name: string
-    imagePath: string
-  }>
+    id: number;
+    name: string;
+    imagePath: string;
+  }>;
   transitions: Array<{
-    key: string
-    fromViewId: number
-    toViewId: number
-    videoPath: string
-  }>
-  locations: UploadMetadataLocation[]
+    key: string;
+    fromViewId: number;
+    toViewId: number;
+    videoPath: string;
+  }>;
+  locations: UploadMetadataLocation[];
 }
 
 export interface UnrealUploadMetadataPayload {
-  projectName?: string
-  sourceApplication?: string
-  sourceVersion?: string
+  projectName?: string;
+  sourceApplication?: string;
+  sourceVersion?: string;
   views: Array<{
-    id: string
-    name: string
-    filename: string
-  }>
+    id: string;
+    name: string;
+    filename: string;
+  }>;
   transitions: Array<{
-    from: string
-    to: string
-    filename: string
-  }>
+    from: string;
+    to: string;
+    filename: string;
+  }>;
   locations: Array<{
-    id: string
-    name: string
+    id: string;
+    name: string;
     viewPositions?: Array<{
-      viewId: string
-      x: number
-      y: number
-    }>
-  }>
+      viewId: string;
+      x: number;
+      y: number;
+    }>;
+  }>;
 }
 
-export type UploadRequestMetadata = UploadMetadataPayload | UnrealUploadMetadataPayload
+export type UploadRequestMetadata = UploadMetadataPayload | UnrealUploadMetadataPayload;
 
 function getApiBaseUrl(): string {
-  const apiBaseUrl = import.meta.env.VITE_HORIZON_API_BASE_URL
+  const apiBaseUrl = import.meta.env.VITE_HORIZON_API_BASE_URL;
   if (!apiBaseUrl) {
-    throw new Error('Missing VITE_HORIZON_API_BASE_URL.')
+    throw new Error('Missing VITE_HORIZON_API_BASE_URL.');
   }
-  return apiBaseUrl.replace(/\/$/, '')
+  return apiBaseUrl.replace(/\/$/, '');
 }
 
 async function parseResponse(response: Response): Promise<unknown> {
-  const contentType = response.headers.get('content-type') ?? ''
+  const contentType = response.headers.get('content-type') ?? '';
   if (contentType.includes('application/json')) {
-    return response.json()
+    return response.json();
   }
 
-  const text = await response.text()
-  return text ? { detail: text } : null
+  const text = await response.text();
+  return text ? { detail: text } : null;
 }
 
 function jobResponseFromCreateResponse(job: CreateExportJobResponse): ExportJobResponse {
@@ -103,67 +103,67 @@ function jobResponseFromCreateResponse(job: CreateExportJobResponse): ExportJobR
     ...job,
     errorMessage: null,
     warningMessage: null,
-  }
+  };
 }
 
 async function expectCreateJobResponse(
   response: Response
 ): Promise<DebugResponse & { job: ExportJobResponse }> {
-  const payload = await parseResponse(response)
+  const payload = await parseResponse(response);
 
   if (!response.ok) {
     const detail =
       payload && typeof payload === 'object' && 'detail' in payload
         ? String((payload as { detail: unknown }).detail)
-        : `Request failed: ${response.status}`
-    throw new Error(detail)
+        : `Request failed: ${response.status}`;
+    throw new Error(detail);
   }
 
-  const result = CreateExportJobResponseSchema.safeParse(payload)
+  const result = CreateExportJobResponseSchema.safeParse(payload);
   if (!result.success) {
-    console.error('CreateExportJobResponseSchema validation failed', result.error)
-    throw new Error('Invalid export job response')
+    console.error('CreateExportJobResponseSchema validation failed', result.error);
+    throw new Error('Invalid export job response');
   }
 
   return {
     status: response.status,
     payload,
     job: jobResponseFromCreateResponse(result.data),
-  }
+  };
 }
 
 async function expectJobResponse(
   response: Response
 ): Promise<DebugResponse & { job: ExportJobResponse }> {
-  const payload = await parseResponse(response)
+  const payload = await parseResponse(response);
 
   if (!response.ok) {
     const detail =
       payload && typeof payload === 'object' && 'detail' in payload
         ? String((payload as { detail: unknown }).detail)
-        : `Request failed: ${response.status}`
-    throw new Error(detail)
+        : `Request failed: ${response.status}`;
+    throw new Error(detail);
   }
 
-  const result = ExportJobResponseSchema.safeParse(payload)
+  const result = ExportJobResponseSchema.safeParse(payload);
   if (!result.success) {
-    console.error('ExportJobResponseSchema validation failed', result.error)
-    throw new Error('Invalid export job response')
+    console.error('ExportJobResponseSchema validation failed', result.error);
+    throw new Error('Invalid export job response');
   }
 
   return {
     status: response.status,
     payload,
     job: result.data,
-  }
+  };
 }
 
 function newExportId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
+    return crypto.randomUUID();
   }
   // Older Safari and any non-secure context lack randomUUID.
-  return `export-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  return `export-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /**
@@ -177,13 +177,13 @@ export async function createExportJob(
   workspaceId: string,
   exportId: string = newExportId()
 ): Promise<ExportJobApiResult> {
-  const url = `${getApiBaseUrl()}/api/exports/${encodeURIComponent(workspaceId)}/new`
-  const body = JSON.stringify({ exportId })
+  const url = `${getApiBaseUrl()}/api/exports/${encodeURIComponent(workspaceId)}/new`;
+  const body = JSON.stringify({ exportId });
   const debugRequest: DebugRequest = {
     method: 'POST',
     url,
     summary: body,
-  }
+  };
 
   // Creating and uploading require an AURA account; the export is recorded
   // against whoever the token identifies, and only they can edit it afterwards.
@@ -191,14 +191,14 @@ export async function createExportJob(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body,
-  })
-  const { job, status, payload } = await expectCreateJobResponse(response)
+  });
+  const { job, status, payload } = await expectCreateJobResponse(response);
 
   return {
     job,
     debugRequest,
     debugResponse: { status, payload },
-  }
+  };
 }
 
 export async function uploadExportZip(
@@ -210,14 +210,14 @@ export async function uploadExportZip(
 ): Promise<ExportJobApiResult> {
   const url = `${getApiBaseUrl()}/api/exports/${encodeURIComponent(workspaceId)}/${encodeURIComponent(
     exportId
-  )}/upload`
-  const formData = new FormData()
-  formData.append('file', file)
+  )}/upload`;
+  const formData = new FormData();
+  formData.append('file', file);
   if (metadata) {
-    formData.append('metadata', JSON.stringify(metadata))
+    formData.append('metadata', JSON.stringify(metadata));
   }
   if (format) {
-    formData.append('format', format)
+    formData.append('format', format);
   }
 
   const debugRequest: DebugRequest = {
@@ -226,21 +226,21 @@ export async function uploadExportZip(
     summary: metadata
       ? `multipart/form-data with file=${file.name} (${file.type || 'unknown type'}, ${file.size} bytes) and metadata JSON${format ? ` and format=${format}` : ''}`
       : `multipart/form-data with file=${file.name} (${file.type || 'unknown type'}, ${file.size} bytes)`,
-  }
+  };
 
   // No Content-Type: the browser must set the multipart boundary itself.
   const response = await fetch(url, {
     method: 'POST',
     headers: { ...authHeaders() },
     body: formData,
-  })
-  const { job, status, payload } = await expectJobResponse(response)
+  });
+  const { job, status, payload } = await expectJobResponse(response);
 
   return {
     job,
     debugRequest,
     debugResponse: { status, payload },
-  }
+  };
 }
 
 export async function fetchExportJob(
@@ -249,19 +249,19 @@ export async function fetchExportJob(
 ): Promise<ExportJobApiResult> {
   const url = `${getApiBaseUrl()}/api/exports/${encodeURIComponent(workspaceId)}/${encodeURIComponent(
     exportId
-  )}`
+  )}`;
   const debugRequest: DebugRequest = {
     method: 'GET',
     url,
     summary: 'No request body',
-  }
+  };
 
-  const response = await fetch(url)
-  const { job, status, payload } = await expectJobResponse(response)
+  const response = await fetch(url);
+  const { job, status, payload } = await expectJobResponse(response);
 
   return {
     job,
     debugRequest,
     debugResponse: { status, payload },
-  }
+  };
 }

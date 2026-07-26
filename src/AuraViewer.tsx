@@ -23,14 +23,34 @@ const ARROW_GAP = 12;
 const SIDE_PADDING = 48;
 
 const ChevronLeft = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m15 18-6-6 6-6"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="m15 18-6-6 6-6" />
   </svg>
 );
 
 const ChevronRight = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m9 18 6-6-6-6"/>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="m9 18 6-6-6-6" />
   </svg>
 );
 
@@ -69,12 +89,18 @@ const projectPin = (
   const pixelX = offsetX + (pinX / 100) * renderedWidth;
   const pixelY = offsetY + (pinY / 100) * renderedHeight;
 
-  const visible = pixelX >= 0 && pixelX <= container.width && pixelY >= 0 && pixelY <= container.height;
+  const visible =
+    pixelX >= 0 && pixelX <= container.width && pixelY >= 0 && pixelY <= container.height;
 
   return { left: `${pixelX}px`, top: `${pixelY}px`, visible };
 };
 
-const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, currentExportId }) => {
+const AuraViewer: React.FC<AuraViewerProps> = ({
+  config,
+  session,
+  canEdit,
+  currentExportId,
+}) => {
   const { views, transitions, locations } = config;
 
   const [currentViewId, setCurrentViewId] = useState(views[0]?.id || 1);
@@ -90,7 +116,9 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
     containerHeight: 0,
   });
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 1920, height: 1080 });
-  const [openPanels, setOpenPanels] = useState<{ location: AuraLocation; left: string; top: string }[]>([]);
+  const [openPanels, setOpenPanels] = useState<
+    { location: AuraLocation; left: string; top: string }[]
+  >([]);
   const [altLayerIndex, setAltLayerIndex] = useState<Record<number, number>>({});
 
   const videoCache = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -101,10 +129,13 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const currentView = useMemo(() => views.find(v => v.id === currentViewId), [views, currentViewId]);
+  const currentView = useMemo(
+    () => views.find((v) => v.id === currentViewId),
+    [views, currentViewId]
+  );
 
   const currentTransitions = useMemo(
-    () => transitions.filter(t => t.from === currentViewId),
+    () => transitions.filter((t) => t.from === currentViewId),
     [transitions, currentViewId]
   );
 
@@ -132,7 +163,8 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
     video.playsInline = true;
     video.preload = 'metadata';
     video.className = 'w-full h-full object-cover';
-    video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:translateZ(0)';
+    video.style.cssText =
+      'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:translateZ(0)';
     video.src = url;
     cache.set(key, video);
     return video;
@@ -190,11 +222,11 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
   // On arrival, register outgoing transitions at metadata weight and warm them
   // one at a time so a single click never competes with four other downloads.
   useEffect(() => {
-    const keys = currentTransitions.map(t => t.key);
+    const keys = currentTransitions.map((t) => t.key);
     for (const t of currentTransitions) acquireVideo(t.key, t.videoUrl);
     evictExcess(new Set(keys));
 
-    warmQueue.current = keys.filter(k => {
+    warmQueue.current = keys.filter((k) => {
       const v = videoCache.current.get(k);
       return v && v.readyState < 4;
     });
@@ -234,7 +266,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
     const measure = () => {
       frame = 0;
       const el = containerRef.current;
-      setViewport(prev => {
+      setViewport((prev) => {
         const next = {
           windowWidth: window.innerWidth,
           containerWidth: el ? el.offsetWidth : prev.containerWidth,
@@ -277,13 +309,23 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
   const [videoExpanded, setVideoExpanded] = useState(false);
   const ytPlayerRef = useRef<any>(null);
   const ytContainerRef = useRef<HTMLDivElement>(null);
-  const ytDragRef = useRef<{ isDragging: boolean; lastX: number; lastY: number; startX: number; startY: number; didDrag: boolean }>({ isDragging: false, lastX: 0, lastY: 0, startX: 0, startY: 0, didDrag: false });
+  const ytDragRef = useRef<{
+    isDragging: boolean;
+    lastX: number;
+    lastY: number;
+    startX: number;
+    startY: number;
+    didDrag: boolean;
+  }>({ isDragging: false, lastX: 0, lastY: 0, startX: 0, startY: 0, didDrag: false });
 
   const embed = currentView?.embed;
   const showEmbed = !!embed && embed.type === 'youtube360' && !isTransitioning;
 
   // Only pull in the YouTube API for projects that actually use an embed.
-  const wantsEmbed = useMemo(() => views.some(v => v.embed?.type === 'youtube360'), [views]);
+  const wantsEmbed = useMemo(
+    () => views.some((v) => v.embed?.type === 'youtube360'),
+    [views]
+  );
 
   useEffect(() => {
     if (!wantsEmbed || (window as any).YT) return;
@@ -317,7 +359,14 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
   }, [showEmbed, embed]);
 
   const handleYtMouseDown = useCallback((e: React.MouseEvent) => {
-    ytDragRef.current = { isDragging: true, lastX: e.clientX, lastY: e.clientY, startX: e.clientX, startY: e.clientY, didDrag: false };
+    ytDragRef.current = {
+      isDragging: true,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      startX: e.clientX,
+      startY: e.clientY,
+      didDrag: false,
+    };
     e.preventDefault();
   }, []);
 
@@ -329,7 +378,8 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
       const deltaY = e.clientY - d.lastY;
       d.lastX = e.clientX;
       d.lastY = e.clientY;
-      if (Math.abs(e.clientX - d.startX) > 5 || Math.abs(e.clientY - d.startY) > 5) d.didDrag = true;
+      if (Math.abs(e.clientX - d.startX) > 5 || Math.abs(e.clientY - d.startY) > 5)
+        d.didDrag = true;
       try {
         const props = ytPlayerRef.current.getSphericalProperties();
         if (props && typeof props.yaw === 'number') {
@@ -342,167 +392,209 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
         }
       } catch (_) {}
     };
-    const onUp = () => { ytDragRef.current.isDragging = false; };
+    const onUp = () => {
+      ytDragRef.current.isDragging = false;
+    };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
   }, []);
 
   const handleYtClick = useCallback(() => {
     if (!ytPlayerRef.current) return;
     const state = ytPlayerRef.current.getPlayerState();
-    if (state === 1) { ytPlayerRef.current.pauseVideo(); }
-    else { ytPlayerRef.current.playVideo(); }
+    if (state === 1) {
+      ytPlayerRef.current.pauseVideo();
+    } else {
+      ytPlayerRef.current.playVideo();
+    }
   }, []);
 
   useEffect(() => {
     if (!currentView?.imageUrl) return;
     const img = new Image();
-    img.onload = () => setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onload = () =>
+      setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
     img.src = currentView.imageUrl;
   }, [currentView?.imageUrl]);
 
-  const handleTransition = useCallback((targetId: number) => {
-    if (isTransitioning || targetId === currentViewId) return;
+  const handleTransition = useCallback(
+    (targetId: number) => {
+      if (isTransitioning || targetId === currentViewId) return;
 
-    const targetView = views.find(v => v.id === targetId);
-    const fromImage = currentView?.imageUrl ?? null;
-    const transitionKey = `${currentViewId}-${targetId}`;
-    const video = videoCache.current.get(transitionKey);
+      const targetView = views.find((v) => v.id === targetId);
+      const fromImage = currentView?.imageUrl ?? null;
+      const transitionKey = `${currentViewId}-${targetId}`;
+      const video = videoCache.current.get(transitionKey);
 
-    // The destination still has the whole transition to arrive.
-    preloadStill(targetView?.imageUrl);
+      // The destination still has the whole transition to arrive.
+      preloadStill(targetView?.imageUrl);
 
-    const crossfade = () => {
-      setFadeOutImage(fromImage);
-      setCurrentViewId(targetId);
-      setIsTransitioning(false);
-      setActiveTransitionKey(null);
-      activeVideoRef.current = null;
-      const container = videoContainerRef.current;
-      if (container) container.replaceChildren();
-    };
-
-    if (!video) {
-      crossfade();
-      return;
-    }
-
-    setActiveTransitionKey(transitionKey);
-    setIsTransitioning(true);
-    setVideoExpanded(false);
-
-    video.onended = () => {
-      video.pause();
-      const swap = () => {
+      const crossfade = () => {
+        setFadeOutImage(fromImage);
         setCurrentViewId(targetId);
-        requestAnimationFrame(() => {
+        setIsTransitioning(false);
+        setActiveTransitionKey(null);
+        activeVideoRef.current = null;
+        const container = videoContainerRef.current;
+        if (container) container.replaceChildren();
+      };
+
+      if (!video) {
+        crossfade();
+        return;
+      }
+
+      setActiveTransitionKey(transitionKey);
+      setIsTransitioning(true);
+      setVideoExpanded(false);
+
+      video.onended = () => {
+        video.pause();
+        const swap = () => {
+          setCurrentViewId(targetId);
           requestAnimationFrame(() => {
-            setIsTransitioning(false);
-            setActiveTransitionKey(null);
-            activeVideoRef.current = null;
-            const container = videoContainerRef.current;
-            if (container) container.replaceChildren();
+            requestAnimationFrame(() => {
+              setIsTransitioning(false);
+              setActiveTransitionKey(null);
+              activeVideoRef.current = null;
+              const container = videoContainerRef.current;
+              if (container) container.replaceChildren();
+            });
           });
+        };
+
+        const cached = targetView?.imageUrl
+          ? stillCache.current.get(targetView.imageUrl)
+          : undefined;
+        if (cached && !cached.complete) {
+          cached.addEventListener('load', swap, { once: true });
+          cached.addEventListener('error', swap, { once: true });
+        } else {
+          swap();
+        }
+      };
+
+      let settled = false;
+      const play = () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timer);
+        video.removeEventListener('canplay', play);
+        const container = videoContainerRef.current;
+        if (container) container.replaceChildren(video);
+        activeVideoRef.current = video;
+        video.currentTime = 0;
+        video.play().catch(() => {
+          video.onended = null;
+          crossfade();
         });
       };
 
-      const cached = targetView?.imageUrl ? stillCache.current.get(targetView.imageUrl) : undefined;
-      if (cached && !cached.complete) {
-        cached.addEventListener('load', swap, { once: true });
-        cached.addEventListener('error', swap, { once: true });
-      } else {
-        swap();
-      }
-    };
-
-    let settled = false;
-    const play = () => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      video.removeEventListener('canplay', play);
-      const container = videoContainerRef.current;
-      if (container) container.replaceChildren(video);
-      activeVideoRef.current = video;
-      video.currentTime = 0;
-      video.play().catch(() => {
+      // Never sit on a blank frame waiting for bytes — fall back to a crossfade.
+      const timer = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        video.removeEventListener('canplay', play);
         video.onended = null;
         crossfade();
-      });
-    };
+      }, VIDEO_READY_TIMEOUT);
 
-    // Never sit on a blank frame waiting for bytes — fall back to a crossfade.
-    const timer = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      video.removeEventListener('canplay', play);
-      video.onended = null;
-      crossfade();
-    }, VIDEO_READY_TIMEOUT);
-
-    if (video.readyState >= 3) {
-      play();
-    } else {
-      video.addEventListener('canplay', play);
-      if (video.preload !== 'auto') {
-        video.preload = 'auto';
-        video.load();
+      if (video.readyState >= 3) {
+        play();
+      } else {
+        video.addEventListener('canplay', play);
+        if (video.preload !== 'auto') {
+          video.preload = 'auto';
+          video.load();
+        }
       }
-    }
-  }, [isTransitioning, currentViewId, views, currentView?.imageUrl, preloadStill]);
+    },
+    [isTransitioning, currentViewId, views, currentView?.imageUrl, preloadStill]
+  );
 
-  const availableWidth = viewport.windowWidth - (2 * SIDE_PADDING) - (2 * ARROW_WIDTH) - (2 * ARROW_GAP);
-  const maxCardsThatFit = Math.floor((availableWidth + CARD_GAP) / (CARD_WIDTH + CARD_GAP));
+  const availableWidth =
+    viewport.windowWidth - 2 * SIDE_PADDING - 2 * ARROW_WIDTH - 2 * ARROW_GAP;
+  const maxCardsThatFit = Math.floor(
+    (availableWidth + CARD_GAP) / (CARD_WIDTH + CARD_GAP)
+  );
   const MAX_VISIBLE_CARDS = Math.max(2, Math.min(10, maxCardsThatFit, views.length));
 
   const maxIndex = Math.max(0, views.length - MAX_VISIBLE_CARDS);
   const validCarouselIndex = Math.min(carouselIndex, maxIndex);
 
-  const scrollCarousel = useCallback((direction: 'left' | 'right') => {
-    setCarouselIndex(prev => {
-      const clamped = Math.min(prev, maxIndex);
-      return direction === 'left' ? Math.max(0, clamped - 1) : Math.min(maxIndex, clamped + 1);
-    });
-  }, [maxIndex]);
+  const scrollCarousel = useCallback(
+    (direction: 'left' | 'right') => {
+      setCarouselIndex((prev) => {
+        const clamped = Math.min(prev, maxIndex);
+        return direction === 'left'
+          ? Math.max(0, clamped - 1)
+          : Math.min(maxIndex, clamped + 1);
+      });
+    },
+    [maxIndex]
+  );
 
   const canScrollLeft = validCarouselIndex > 0;
   const canScrollRight = validCarouselIndex < maxIndex;
 
   const pinPositions = useMemo(() => {
-    const container = { width: viewport.containerWidth, height: viewport.containerHeight };
-    return locations.map(location => {
-      const viewPosition = location.viewPositions.find(vp => vp.viewId === currentViewId);
+    const container = {
+      width: viewport.containerWidth,
+      height: viewport.containerHeight,
+    };
+    return locations.map((location) => {
+      const viewPosition = location.viewPositions.find(
+        (vp) => vp.viewId === currentViewId
+      );
       if (!viewPosition) return null;
       const pos = projectPin(viewPosition.x, viewPosition.y, container, imageNaturalSize);
       return pos.visible ? { location, ...pos } : null;
     });
-  }, [locations, currentViewId, viewport.containerWidth, viewport.containerHeight, imageNaturalSize]);
+  }, [
+    locations,
+    currentViewId,
+    viewport.containerWidth,
+    viewport.containerHeight,
+    imageNaturalSize,
+  ]);
 
   const handlePinClick = useCallback((loc: AuraLocation, left: string, top: string) => {
-    setOpenPanels(prev =>
-      prev.some(p => p.location.id === loc.id)
-        ? prev.filter(p => p.location.id !== loc.id)
+    setOpenPanels((prev) =>
+      prev.some((p) => p.location.id === loc.id)
+        ? prev.filter((p) => p.location.id !== loc.id)
         : [...prev, { location: loc, left, top }]
     );
   }, []);
 
-  const handleCardClick = useCallback((node: ViewNode) => {
-    if (node.id === currentViewId && node.alternateLayers && node.alternateLayers.length > 0) {
-      const totalLayers = node.alternateLayers.length + 1;
-      setAltLayerIndex(prev => ({ ...prev, [node.id]: ((prev[node.id] || 0) + 1) % totalLayers }));
-    } else {
-      handleTransition(node.id);
-    }
-  }, [currentViewId, handleTransition]);
+  const handleCardClick = useCallback(
+    (node: ViewNode) => {
+      if (
+        node.id === currentViewId &&
+        node.alternateLayers &&
+        node.alternateLayers.length > 0
+      ) {
+        const totalLayers = node.alternateLayers.length + 1;
+        setAltLayerIndex((prev) => ({
+          ...prev,
+          [node.id]: ((prev[node.id] || 0) + 1) % totalLayers,
+        }));
+      } else {
+        handleTransition(node.id);
+      }
+    },
+    [currentViewId, handleTransition]
+  );
 
   return (
     <div
       data-testid="aura-viewer"
       data-current-view={currentView?.name ?? ''}
-      className="relative w-full h-full bg-black overflow-hidden"
+      className="relative h-full w-full overflow-hidden bg-black"
     >
-
       {/* Layer 0: Static View Image (base) */}
       <div
         ref={containerRef}
@@ -530,7 +622,8 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
       )}
 
       {/* Layer 0b: Alternate layer (fades in/out on top of base) */}
-      {currentView?.alternateLayers && currentView.alternateLayers.length > 0 && (
+      {currentView?.alternateLayers &&
+        currentView.alternateLayers.length > 0 &&
         currentView.alternateLayers.map((alt, i) => {
           const activeAlt = (altLayerIndex[currentViewId] || 0) - 1;
           return (
@@ -546,8 +639,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
               }}
             />
           );
-        })
-      )}
+        })}
 
       {/* Layer 1: Location Pins (behind video) */}
       <div className="absolute inset-0 z-[5]">
@@ -560,7 +652,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
               left={entry.left}
               top={entry.top}
               isVisible={!isTransitioning}
-              isSelected={openPanels.some(p => p.location.id === entry.location.id)}
+              isSelected={openPanels.some((p) => p.location.id === entry.location.id)}
               onClick={handlePinClick}
             />
           );
@@ -568,87 +660,85 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
       </div>
 
       {/* Panel Layer */}
-      {!isTransitioning && openPanels.map(panel => (
-        <div
-          key={panel.location.id}
-          className="absolute z-[9] rounded-xl overflow-hidden"
-          style={{
-            left: panel.left,
-            top: panel.top,
-            transform: 'translate(40px, -28px)',
-            minWidth: '280px',
-            maxWidth: '360px',
-            background: 'rgba(60, 60, 60, 0.25)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: '1px solid rgba(200, 200, 200, 0.4)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-            transformOrigin: 'left top',
-            animation: 'panelEmerge 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-          }}
-        >
-          <div className="px-4 py-3 border-b border-white/10">
-            <h3 className="text-white font-semibold text-sm tracking-wide">
-              {panel.location.Name}
-            </h3>
-            {panel.location.Description?.Type && (
-              <span className="text-white/50 text-xs uppercase tracking-wider">
-                {panel.location.Description.Type}
-              </span>
-            )}
-          </div>
+      {!isTransitioning &&
+        openPanels.map((panel) => (
+          <div
+            key={panel.location.id}
+            className="absolute z-[9] overflow-hidden rounded-xl"
+            style={{
+              left: panel.left,
+              top: panel.top,
+              transform: 'translate(40px, -28px)',
+              minWidth: '280px',
+              maxWidth: '360px',
+              background: 'rgba(60, 60, 60, 0.25)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1px solid rgba(200, 200, 200, 0.4)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+              transformOrigin: 'left top',
+              animation: 'panelEmerge 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}
+          >
+            <div className="border-b border-white/10 px-4 py-3">
+              <h3 className="text-sm font-semibold tracking-wide text-white">
+                {panel.location.Name}
+              </h3>
+              {panel.location.Description?.Type && (
+                <span className="text-xs uppercase tracking-wider text-white/50">
+                  {panel.location.Description.Type}
+                </span>
+              )}
+            </div>
 
-          <div className="px-4 py-3 space-y-3">
-            {panel.location.Description?.Short && (
-              <p className="text-white/80 text-xs leading-relaxed">
-                {panel.location.Description.Short}
-              </p>
-            )}
+            <div className="space-y-3 px-4 py-3">
+              {panel.location.Description?.Short && (
+                <p className="text-xs leading-relaxed text-white/80">
+                  {panel.location.Description.Short}
+                </p>
+              )}
 
-            {panel.location.Address && (
-              <div className="flex items-start gap-2">
-                <span className="text-white/40 text-xs uppercase tracking-wider w-16 flex-shrink-0">
-                  Address
-                </span>
-                <span className="text-white/70 text-xs">
-                  {panel.location.Address}
-                </span>
-              </div>
-            )}
-
-            {panel.location.Region && (
-              <div className="flex items-start gap-2">
-                <span className="text-white/40 text-xs uppercase tracking-wider w-16 flex-shrink-0">
-                  Region
-                </span>
-                <span className="text-white/70 text-xs">
-                  {panel.location.Region}
-                </span>
-              </div>
-            )}
-
-            {panel.location.Attributes && Object.keys(panel.location.Attributes).length > 0 && (
-              <div className="pt-2 border-t border-white/10">
-                <span className="text-white/40 text-xs uppercase tracking-wider block mb-2">
-                  Details
-                </span>
-                <div className="space-y-1">
-                  {Object.entries(panel.location.Attributes).map(([key, value]) => (
-                    <div key={key} className="flex items-start gap-2">
-                      <span className="text-white/50 text-xs w-24 flex-shrink-0">
-                        {key}
-                      </span>
-                      <span className="text-white/80 text-xs font-medium">
-                        {value}
-                      </span>
-                    </div>
-                  ))}
+              {panel.location.Address && (
+                <div className="flex items-start gap-2">
+                  <span className="w-16 flex-shrink-0 text-xs uppercase tracking-wider text-white/40">
+                    Address
+                  </span>
+                  <span className="text-xs text-white/70">{panel.location.Address}</span>
                 </div>
-              </div>
-            )}
+              )}
+
+              {panel.location.Region && (
+                <div className="flex items-start gap-2">
+                  <span className="w-16 flex-shrink-0 text-xs uppercase tracking-wider text-white/40">
+                    Region
+                  </span>
+                  <span className="text-xs text-white/70">{panel.location.Region}</span>
+                </div>
+              )}
+
+              {panel.location.Attributes &&
+                Object.keys(panel.location.Attributes).length > 0 && (
+                  <div className="border-t border-white/10 pt-2">
+                    <span className="mb-2 block text-xs uppercase tracking-wider text-white/40">
+                      Details
+                    </span>
+                    <div className="space-y-1">
+                      {Object.entries(panel.location.Attributes).map(([key, value]) => (
+                        <div key={key} className="flex items-start gap-2">
+                          <span className="w-24 flex-shrink-0 text-xs text-white/50">
+                            {key}
+                          </span>
+                          <span className="text-xs font-medium text-white/80">
+                            {value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
 
       {/* YouTube 360 embed */}
       {showEmbed && (
@@ -673,10 +763,14 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
               overflow: 'hidden',
               boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
               border: '1px solid rgba(255,255,255,0.3)',
-              transition: 'width 400ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 400ms ease',
+              transition:
+                'width 400ms cubic-bezier(0.4, 0, 0.2, 1), border-radius 400ms ease',
             }}
           >
-            <div ref={ytContainerRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+            <div
+              ref={ytContainerRef}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+            />
 
             <div
               style={{
@@ -699,7 +793,10 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
               }}
             >
               {!videoExpanded && (
-                <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.15)' }}>
+                <div
+                  className="absolute inset-0 flex items-center justify-center"
+                  style={{ background: 'rgba(0,0,0,0.15)' }}
+                >
                   <div
                     style={{
                       width: 56,
@@ -712,7 +809,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
                     }}
                   >
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-                      <path d="M8 5v14l11-7z"/>
+                      <path d="M8 5v14l11-7z" />
                     </svg>
                   </div>
                 </div>
@@ -725,11 +822,11 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
       {/* Layer 2: Review Tools canvas overlay (behind video) */}
       <ReviewTools
         expanded={toolbarExpanded}
-        onToggle={() => setToolbarExpanded(prev => !prev)}
+        onToggle={() => setToolbarExpanded((prev) => !prev)}
         viewId={currentViewId}
         isTransitioning={isTransitioning}
         navExpanded={timelineExpanded}
-        onNavToggle={() => setTimelineExpanded(prev => !prev)}
+        onNavToggle={() => setTimelineExpanded((prev) => !prev)}
         session={session}
         canEdit={canEdit}
         currentExportId={currentExportId}
@@ -746,19 +843,19 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
       />
 
       {/* Navigation - Centered Bottom Carousel */}
-      <div className="absolute bottom-2 left-1/2 -translate-x-1/2" style={{ zIndex: 10000 }}>
+      <div
+        className="absolute bottom-2 left-1/2 -translate-x-1/2"
+        style={{ zIndex: 10000 }}
+      >
         <div className="flex flex-col items-center gap-1.5">
-
-          <div className={`
-            flex items-center transition-all duration-300 ease-out
-            ${timelineExpanded ? 'gap-3' : 'gap-2'}
-          `}>
-
+          <div
+            className={`flex items-center transition-all duration-300 ease-out ${timelineExpanded ? 'gap-3' : 'gap-2'} `}
+          >
             {canScrollLeft && timelineExpanded && (
               <button
                 onClick={() => scrollCarousel('left')}
                 disabled={isTransitioning}
-                className="flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-300 ease-out"
+                className="flex items-center justify-center shadow-lg transition-all duration-300 ease-out hover:scale-105"
                 style={{
                   width: 40,
                   height: 40,
@@ -778,7 +875,9 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
               style={{
                 overflow: 'hidden',
                 width: timelineExpanded
-                  ? MAX_VISIBLE_CARDS * CARD_WIDTH + (MAX_VISIBLE_CARDS - 1) * CARD_GAP + 20
+                  ? MAX_VISIBLE_CARDS * CARD_WIDTH +
+                    (MAX_VISIBLE_CARDS - 1) * CARD_GAP +
+                    20
                   : MAX_VISIBLE_CARDS * 6 + (MAX_VISIBLE_CARDS - 1) * 8,
                 transition: 'width 300ms ease-out',
               }}
@@ -792,21 +891,36 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
                   transform: timelineExpanded
                     ? `translateX(${-validCarouselIndex * (CARD_WIDTH + CARD_GAP)}px)`
                     : 'none',
-                  transition: 'transform 400ms cubic-bezier(0.4, 0, 0.2, 1), gap 300ms ease-out, padding 300ms ease-out',
+                  transition:
+                    'transform 400ms cubic-bezier(0.4, 0, 0.2, 1), gap 300ms ease-out, padding 300ms ease-out',
                 }}
               >
-                {(timelineExpanded ? views : views.slice(validCarouselIndex, validCarouselIndex + MAX_VISIBLE_CARDS)).map((node, index) => {
-                  const actualIndex = timelineExpanded ? index : validCarouselIndex + index;
+                {(timelineExpanded
+                  ? views
+                  : views.slice(
+                      validCarouselIndex,
+                      validCarouselIndex + MAX_VISIBLE_CARDS
+                    )
+                ).map((node, index) => {
+                  const actualIndex = timelineExpanded
+                    ? index
+                    : validCarouselIndex + index;
                   const isActive = node.id === currentViewId && !isTransitioning;
-                  const isTarget = isTransitioning && transitions.some(t => t.key === activeTransitionKey && t.to === node.id);
-                  const isInView = actualIndex >= validCarouselIndex && actualIndex < validCarouselIndex + MAX_VISIBLE_CARDS;
+                  const isTarget =
+                    isTransitioning &&
+                    transitions.some(
+                      (t) => t.key === activeTransitionKey && t.to === node.id
+                    );
+                  const isInView =
+                    actualIndex >= validCarouselIndex &&
+                    actualIndex < validCarouselIndex + MAX_VISIBLE_CARDS;
 
                   // Dock effect runs on the compositor: the layout box stays fixed
                   // and only `transform` animates, so navigating never triggers layout.
                   const isBig = isActive || isTarget;
                   const scale = isBig ? 1.15 : 0.9;
                   const dotSize = isActive ? 10 : 6;
-                  const borderRadius = timelineExpanded ? 12 : (isActive ? 5 : 3);
+                  const borderRadius = timelineExpanded ? 12 : isActive ? 5 : 3;
 
                   return (
                     <button
@@ -815,21 +929,20 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
                       onPointerEnter={() => prioritize(`${currentViewId}-${node.id}`)}
                       onFocus={() => prioritize(`${currentViewId}-${node.id}`)}
                       disabled={isTransitioning}
-                      className={`
-                        relative overflow-hidden flex-shrink-0
-                        ${timelineExpanded
+                      className={`relative flex-shrink-0 overflow-hidden ${
+                        timelineExpanded
                           ? 'shadow-lg hover:shadow-xl'
                           : `${isActive ? 'bg-white' : 'bg-white/50 hover:bg-white/80'}`
-                        }
-                        ${isTransitioning ? 'cursor-wait' : 'cursor-pointer'}
-                      `}
+                      } ${isTransitioning ? 'cursor-wait' : 'cursor-pointer'} `}
                       style={{
                         width: timelineExpanded ? CARD_WIDTH : dotSize,
                         height: timelineExpanded ? CARD_HEIGHT : dotSize,
                         transform: timelineExpanded ? `scale(${scale})` : 'none',
                         borderRadius,
                         opacity: timelineExpanded ? (isInView ? 1 : 0) : 1,
-                        border: timelineExpanded ? '1px solid rgba(255,255,255,0.2)' : 'none',
+                        border: timelineExpanded
+                          ? '1px solid rgba(255,255,255,0.2)'
+                          : 'none',
                         boxSizing: 'border-box',
                         willChange: 'transform',
                         transition:
@@ -846,10 +959,13 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
                       />
                       <div
                         className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent"
-                        style={{ opacity: timelineExpanded ? 1 : 0, transition: 'opacity 300ms ease-out' }}
+                        style={{
+                          opacity: timelineExpanded ? 1 : 0,
+                          transition: 'opacity 300ms ease-out',
+                        }}
                       />
                       <span
-                        className="absolute top-2 left-3 font-bold tracking-tight leading-none text-white"
+                        className="absolute left-3 top-2 font-bold leading-none tracking-tight text-white"
                         style={{
                           opacity: timelineExpanded ? 1 : 0,
                           transition: 'opacity 300ms ease-out',
@@ -860,7 +976,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
                         {String(actualIndex + 1).padStart(2, '0')}
                       </span>
                       <span
-                        className="absolute bottom-2 left-3 right-3 text-left font-normal truncate leading-tight text-white"
+                        className="absolute bottom-2 left-3 right-3 truncate text-left font-normal leading-tight text-white"
                         style={{
                           opacity: timelineExpanded ? 1 : 0,
                           transition: 'opacity 300ms ease-out',
@@ -870,22 +986,30 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
                       >
                         {node.name}
                       </span>
-                      {timelineExpanded && node.alternateLayers && node.alternateLayers.length > 0 && isActive && (
-                        <div className="absolute top-2 right-2 flex gap-1">
-                          {[0, ...node.alternateLayers.map((_, i) => i + 1)].map(layerIdx => (
-                            <div
-                              key={layerIdx}
-                              style={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: '50%',
-                                background: (altLayerIndex[node.id] || 0) === layerIdx ? 'white' : 'rgba(255,255,255,0.4)',
-                                transition: 'background 300ms ease',
-                              }}
-                            />
-                          ))}
-                        </div>
-                      )}
+                      {timelineExpanded &&
+                        node.alternateLayers &&
+                        node.alternateLayers.length > 0 &&
+                        isActive && (
+                          <div className="absolute right-2 top-2 flex gap-1">
+                            {[0, ...node.alternateLayers.map((_, i) => i + 1)].map(
+                              (layerIdx) => (
+                                <div
+                                  key={layerIdx}
+                                  style={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: '50%',
+                                    background:
+                                      (altLayerIndex[node.id] || 0) === layerIdx
+                                        ? 'white'
+                                        : 'rgba(255,255,255,0.4)',
+                                    transition: 'background 300ms ease',
+                                  }}
+                                />
+                              )
+                            )}
+                          </div>
+                        )}
                     </button>
                   );
                 })}
@@ -896,7 +1020,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
               <button
                 onClick={() => scrollCarousel('right')}
                 disabled={isTransitioning}
-                className="flex items-center justify-center shadow-lg hover:scale-105 transition-all duration-300 ease-out"
+                className="flex items-center justify-center shadow-lg transition-all duration-300 ease-out hover:scale-105"
                 style={{
                   width: 40,
                   height: 40,
@@ -911,13 +1035,9 @@ const AuraViewer: React.FC<AuraViewerProps> = ({ config, session, canEdit, curre
                 <ChevronRight />
               </button>
             )}
-
           </div>
-
         </div>
       </div>
-
-
     </div>
   );
 };

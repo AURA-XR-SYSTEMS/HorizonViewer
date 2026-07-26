@@ -161,7 +161,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
     <div ref={containerRef} style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen(!open)}
-        title={account ? account.email ?? 'Account' : 'Sign in'}
+        title={account ? (account.email ?? 'Account') : 'Sign in'}
         aria-label={account ? 'Account' : 'Sign in'}
         aria-expanded={open}
         className="flex items-center justify-center rounded-lg transition-all hover:bg-black/10"
@@ -201,15 +201,21 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
           }}
         >
           {restoring ? (
-            <div style={{ fontSize: 13, color: 'rgba(25,25,25,0.5)' }}>Checking session…</div>
+            <div style={{ fontSize: 13, color: 'rgba(25,25,25,0.5)' }}>
+              Checking session…
+            </div>
           ) : account ? (
             <div className="flex flex-col gap-3">
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(25,25,25,0.85)' }}>
+                <div
+                  style={{ fontSize: 13, fontWeight: 600, color: 'rgba(25,25,25,0.85)' }}
+                >
                   {account.name || account.email}
                 </div>
                 {account.name && account.email && (
-                  <div style={{ fontSize: 11, color: 'rgba(25,25,25,0.5)' }}>{account.email}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(25,25,25,0.5)' }}>
+                    {account.email}
+                  </div>
                 )}
               </div>
 
@@ -227,7 +233,9 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                 </div>
 
                 {exports === null ? (
-                  <div style={{ fontSize: 12, color: 'rgba(25,25,25,0.45)' }}>Loading…</div>
+                  <div style={{ fontSize: 12, color: 'rgba(25,25,25,0.45)' }}>
+                    Loading…
+                  </div>
                 ) : exports.length === 0 ? (
                   <div style={{ fontSize: 12, color: 'rgba(25,25,25,0.45)' }}>
                     No scenes published from this account yet.
@@ -247,7 +255,10 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                           <div
                             key={row.exportId}
                             className="rounded-md"
-                            style={{ padding: '6px 7px', background: 'rgba(220,38,38,0.08)' }}
+                            style={{
+                              padding: '6px 7px',
+                              background: 'rgba(220,38,38,0.08)',
+                            }}
                           >
                             <div style={{ fontSize: 11, color: 'rgba(25,25,25,0.7)' }}>
                               Delete permanently? Any shared link stops working.
@@ -262,7 +273,9 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                                   height: 26,
                                   fontSize: 11,
                                   color: 'white',
-                                  background: isDeleting ? 'rgba(220,38,38,0.5)' : '#dc2626',
+                                  background: isDeleting
+                                    ? 'rgba(220,38,38,0.5)'
+                                    : '#dc2626',
                                 }}
                               >
                                 {isDeleting ? 'Deleting…' : 'Delete'}
@@ -317,7 +330,9 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                               {row.projectName || row.exportId}
                             </span>
                             {row.status !== 'ready' && (
-                              <span style={{ fontSize: 10, color: 'rgba(25,25,25,0.45)' }}>
+                              <span
+                                style={{ fontSize: 10, color: 'rgba(25,25,25,0.45)' }}
+                              >
                                 {row.status}
                               </span>
                             )}
@@ -326,7 +341,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                             onClick={() => setConfirmingDelete(row.exportId)}
                             title="Delete scene"
                             aria-label={`Delete ${row.projectName || row.exportId}`}
-                            className="rounded opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-red-600 transition-opacity"
+                            className="rounded opacity-0 transition-opacity hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
                             style={{
                               flexShrink: 0,
                               width: 22,
@@ -363,7 +378,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
 
               <button
                 onClick={handleSignOut}
-                className="rounded-lg hover:bg-black/10 transition-all"
+                className="rounded-lg transition-all hover:bg-black/10"
                 style={{
                   height: 32,
                   fontSize: 12,
@@ -376,7 +391,9 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
             </div>
           ) : (
             <form onSubmit={handleSignIn} className="flex flex-col gap-2">
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(25,25,25,0.85)' }}>
+              <div
+                style={{ fontSize: 13, fontWeight: 600, color: 'rgba(25,25,25,0.85)' }}
+              >
                 Sign in to AURA
               </div>
               <div style={{ fontSize: 11, color: 'rgba(25,25,25,0.5)', marginBottom: 2 }}>

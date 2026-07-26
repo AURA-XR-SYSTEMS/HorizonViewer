@@ -10,7 +10,7 @@ import React from 'react';
 const LandingPage: React.FC = () => (
   <section
     data-testid="landing-page"
-    className="relative w-full h-full flex items-center justify-center overflow-hidden bg-slate-950 px-6 py-10"
+    className="relative flex h-full w-full items-center justify-center overflow-hidden bg-slate-950 px-6 py-10"
   >
     <div
       aria-hidden="true"
@@ -35,9 +35,8 @@ const LandingPage: React.FC = () => (
         Interactive digital twins, published straight from Unreal Engine.
       </p>
       <p className="mt-4 max-w-xl text-sm leading-6 text-white/45">
-        Open a project using the link you were sent. If your link is not working,
-        check with whoever shared it &mdash; published projects can be updated or
-        removed.
+        Open a project using the link you were sent. If your link is not working, check
+        with whoever shared it &mdash; published projects can be updated or removed.
       </p>
     </div>
   </section>

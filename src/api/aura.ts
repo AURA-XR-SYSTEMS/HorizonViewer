@@ -30,7 +30,9 @@ export async function fetchStaticProject(auraKey: string): Promise<ProjectConfig
 }
 
 /** Loads whichever source the URL resolved to. */
-export async function fetchProjectForSource(source: ProjectSource): Promise<LoadedProject> {
+export async function fetchProjectForSource(
+  source: ProjectSource
+): Promise<LoadedProject> {
   switch (source.kind) {
     case 'export':
       return fetchExportConfig(source.exportId);

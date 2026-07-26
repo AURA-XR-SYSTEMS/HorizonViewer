@@ -10,7 +10,14 @@ interface AuraPinProps {
   onClick: (location: AuraLocation, left: string, top: string) => void;
 }
 
-const AuraPin: React.FC<AuraPinProps> = ({ location, left, top, isVisible, isSelected, onClick }) => {
+const AuraPin: React.FC<AuraPinProps> = ({
+  location,
+  left,
+  top,
+  isVisible,
+  isSelected,
+  onClick,
+}) => {
   const handlePinClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onClick(location, left, top);

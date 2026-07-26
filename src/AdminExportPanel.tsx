@@ -49,8 +49,16 @@ function buildDemoUploadMetadata(): UnrealUploadMetadataPayload {
       { id: 'platform-level', name: 'Platform Level', filename: 'assets/view_2.png' },
     ],
     transitions: [
-      { from: 'station-plaza', to: 'platform-level', filename: 'assets/transition_1_2.mp4' },
-      { from: 'platform-level', to: 'station-plaza', filename: 'assets/transition_2_1.mp4' },
+      {
+        from: 'station-plaza',
+        to: 'platform-level',
+        filename: 'assets/transition_1_2.mp4',
+      },
+      {
+        from: 'platform-level',
+        to: 'station-plaza',
+        filename: 'assets/transition_2_1.mp4',
+      },
     ],
     locations: [
       {
@@ -158,7 +166,7 @@ export default function AdminExportPanel({
   return (
     <aside
       data-testid="admin-panel"
-      className="absolute top-4 right-4 z-[70] flex max-h-[calc(100%-2rem)] w-[min(440px,calc(100%-2rem))] flex-col overflow-hidden rounded-2xl border border-white/25 bg-black/80 text-left text-white shadow-2xl backdrop-blur-xl"
+      className="absolute right-4 top-4 z-[70] flex max-h-[calc(100%-2rem)] w-[min(440px,calc(100%-2rem))] flex-col overflow-hidden rounded-2xl border border-white/25 bg-black/80 text-left text-white shadow-2xl backdrop-blur-xl"
     >
       <div className="border-b border-white/10 px-4 py-3">
         <div className="flex items-center justify-between gap-3">
@@ -292,7 +300,8 @@ export default function AdminExportPanel({
           <h3 className="text-sm font-semibold text-white">Last Request</h3>
           <div className="space-y-2 text-sm text-white/75">
             <p>
-              <span className="text-white/45">Method:</span> {lastRequest?.method ?? 'n/a'}
+              <span className="text-white/45">Method:</span>{' '}
+              {lastRequest?.method ?? 'n/a'}
             </p>
             <p className="break-all">
               <span className="text-white/45">URL:</span> {lastRequest?.url ?? 'n/a'}
@@ -311,7 +320,9 @@ export default function AdminExportPanel({
           <h3 className="text-sm font-semibold text-white">Last Response</h3>
           <p className="text-sm text-white/70">
             HTTP status:{' '}
-            <span className="font-medium text-white">{lastResponse?.status ?? 'n/a'}</span>
+            <span className="font-medium text-white">
+              {lastResponse?.status ?? 'n/a'}
+            </span>
           </p>
           <pre
             data-testid="last-response-payload"

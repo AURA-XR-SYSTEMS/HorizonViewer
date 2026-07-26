@@ -57,7 +57,11 @@ async function throwForStatus(response: Response): Promise<never> {
   throw new Error(await readDetail(response, `Request failed: ${response.status}`));
 }
 
-async function putSlice(exportId: string, slice: string, payload: unknown): Promise<void> {
+async function putSlice(
+  exportId: string,
+  slice: string,
+  payload: unknown
+): Promise<void> {
   const response = await fetch(
     `${requireApiBaseUrl()}/exports/${encodeURIComponent(exportId)}/${slice}`,
     {
@@ -73,11 +77,17 @@ export function saveViews(exportId: string, views: ViewNode[]): Promise<void> {
   return putSlice(exportId, 'views', views);
 }
 
-export function saveTransitions(exportId: string, transitions: Transition[]): Promise<void> {
+export function saveTransitions(
+  exportId: string,
+  transitions: Transition[]
+): Promise<void> {
   return putSlice(exportId, 'transitions', transitions);
 }
 
-export function saveLocations(exportId: string, locations: AuraLocation[]): Promise<void> {
+export function saveLocations(
+  exportId: string,
+  locations: AuraLocation[]
+): Promise<void> {
   return putSlice(exportId, 'locations', locations);
 }
 

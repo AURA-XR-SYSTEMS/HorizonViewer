@@ -77,19 +77,19 @@ const App: React.FC = () => {
     content = <LandingPage />;
   } else if (loading) {
     content = (
-      <div className="w-full h-full flex items-center justify-center bg-slate-900">
+      <div className="flex h-full w-full items-center justify-center bg-slate-900">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-          <span className="text-white/60 text-sm font-medium">Loading viewer...</span>
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+          <span className="text-sm font-medium text-white/60">Loading viewer...</span>
         </div>
       </div>
     );
   } else if (error || !config) {
     content = (
-      <div className="w-full h-full flex items-center justify-center bg-slate-900">
-        <div className="flex flex-col items-center gap-4 text-center px-8">
+      <div className="flex h-full w-full items-center justify-center bg-slate-900">
+        <div className="flex flex-col items-center gap-4 px-8 text-center">
           <div
-            className={`w-16 h-16 rounded-full flex items-center justify-center ${
+            className={`flex h-16 w-16 items-center justify-center rounded-full ${
               pending ? 'bg-cyan-500/20' : 'bg-red-500/20'
             }`}
           >
@@ -97,10 +97,10 @@ const App: React.FC = () => {
               {pending ? '…' : '!'}
             </span>
           </div>
-          <span className="text-white/80 text-lg font-medium">
+          <span className="text-lg font-medium text-white/80">
             {pending ? 'Almost ready' : 'Unable to load viewer'}
           </span>
-          <span className="text-white/40 text-sm">{error || 'Project not found'}</span>
+          <span className="text-sm text-white/40">{error || 'Project not found'}</span>
         </div>
       </div>
     );
@@ -116,11 +116,13 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative h-full w-full">
       {content}
       {isAdminPanelEnabled() ? (
         <AdminExportPanel
-          defaultWorkspaceId={import.meta.env.VITE_HORIZON_ADMIN_DEFAULT_WORKSPACE_ID ?? ''}
+          defaultWorkspaceId={
+            import.meta.env.VITE_HORIZON_ADMIN_DEFAULT_WORKSPACE_ID ?? ''
+          }
         />
       ) : null}
     </div>

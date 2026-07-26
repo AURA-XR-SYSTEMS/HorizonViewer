@@ -22,12 +22,12 @@ stack (S3 + CloudFront + ACM) lives in `aura-aws-infra/cloud/static-site/horizon
 
 `src/lib/projectSource.ts` resolves this in priority order:
 
-| URL | Source |
-|---|---|
-| `/<exportId>` | HorizonServer — the shareable client link |
-| `?exportId=<id>` | HorizonServer — older link format, still honoured |
-| `?key=<slug>` or `/embed/<slug>` | bundled project under `public/assets/projects/` |
-| no id | landing page |
+| URL                              | Source                                            |
+| -------------------------------- | ------------------------------------------------- |
+| `/<exportId>`                    | HorizonServer — the shareable client link         |
+| `?exportId=<id>`                 | HorizonServer — older link format, still honoured |
+| `?key=<slug>` or `/embed/<slug>` | bundled project under `public/assets/projects/`   |
+| no id                            | landing page                                      |
 
 Bundled projects exist for local development and offline demos. Anything shared with a
 client should be published through the server so it has a real export id.
@@ -51,8 +51,13 @@ Try `?key=horizon-metro` for a bundled project, or `/horizon-metro-demo` for a p
 ## Embedding
 
 ```html
-<iframe src="https://horizon.auraengine.com/<exportId>" width="100%" height="600"
-        frameborder="0" allow="fullscreen"></iframe>
+<iframe
+  src="https://horizon.auraengine.com/<exportId>"
+  width="100%"
+  height="600"
+  frameborder="0"
+  allow="fullscreen"
+></iframe>
 ```
 
 `/embed/<slug>` still resolves for existing iframes pointing at bundled projects.
