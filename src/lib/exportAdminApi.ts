@@ -1,7 +1,7 @@
 import { OwnedExportSummarySchema, type OwnedExportSummary } from './apiSchemas';
 import { authHeaders } from './auth';
 import { getApiBaseUrl } from './bootstrapClient';
-import type { AuraLocation, Transition, ViewNode } from '../types';
+import type { ProjectConfig, ViewNode } from '../types';
 
 /**
  * Owner-only operations on a published export.
@@ -77,18 +77,20 @@ export function saveViews(exportId: string, views: ViewNode[]): Promise<void> {
   return putSlice(exportId, 'views', views);
 }
 
-export function saveTransitions(
-  exportId: string,
-  transitions: Transition[]
-): Promise<void> {
-  return putSlice(exportId, 'transitions', transitions);
-}
-
-export function saveLocations(
-  exportId: string,
-  locations: AuraLocation[]
-): Promise<void> {
-  return putSlice(exportId, 'locations', locations);
+/**
+ * Replace the whole published config.
+ *
+ * Used for edits that span slices — renaming the project and a view in one go —
+ * because there is no endpoint for the project name alone, and a single PUT
+ * keeps the two from landing separately.
+ *
+ * Send a config derived from what the server last returned. This replaces
+ * rather than merges, so a partial object silently drops the rest of the scene.
+ * Asset URLs may be sent back exactly as received: the server stores them
+ * relative again, so the current hostname is not baked in.
+ */
+export function saveConfig(exportId: string, config: ProjectConfig): Promise<void> {
+  return putSlice(exportId, 'config', config);
 }
 
 /**

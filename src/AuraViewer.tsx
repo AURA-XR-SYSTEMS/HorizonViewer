@@ -10,6 +10,8 @@ interface AuraViewerProps {
   /** Whether the signed-in account owns this scene, per the server. */
   canEdit: boolean;
   currentExportId?: string;
+  /** Applies an owner's saved edit so the viewer reflects it without a reload. */
+  onConfigSaved: (config: ProjectConfig) => void;
 }
 
 const MAX_CACHED_VIDEOS = 12;
@@ -100,6 +102,7 @@ const AuraViewer: React.FC<AuraViewerProps> = ({
   session,
   canEdit,
   currentExportId,
+  onConfigSaved,
 }) => {
   const { views, transitions, locations } = config;
 
@@ -830,6 +833,8 @@ const AuraViewer: React.FC<AuraViewerProps> = ({
         session={session}
         canEdit={canEdit}
         currentExportId={currentExportId}
+        config={config}
+        onConfigSaved={onConfigSaved}
       />
 
       {/* Layer 3: Video container (on top during transitions, pass-through when empty) */}

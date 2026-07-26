@@ -111,6 +111,7 @@ const App: React.FC = () => {
         session={session}
         canEdit={canEdit}
         currentExportId={source.kind === 'export' ? source.exportId : undefined}
+        onConfigSaved={setConfig}
       />
     );
   }

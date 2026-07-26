@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import AccountMenu from './AccountMenu';
+import SceneEditor from './SceneEditor';
+import type { ProjectConfig } from './types';
 import type { Session } from './lib/useSession';
 
 // --- Icons ---
@@ -262,6 +264,8 @@ interface ReviewToolsProps {
   /** True when the signed-in account owns the open scene, per the server. */
   canEdit: boolean;
   currentExportId?: string;
+  config: ProjectConfig;
+  onConfigSaved: (config: ProjectConfig) => void;
 }
 
 const ReviewTools: React.FC<ReviewToolsProps> = ({
@@ -274,6 +278,8 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
   session,
   canEdit,
   currentExportId,
+  config,
+  onConfigSaved,
 }) => {
   const [activeTool, setActiveTool] = useState<ReviewTool>('select');
   const [activeColor, setActiveColor] = useState('#ff3b30');
@@ -895,21 +901,29 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
               className="flex flex-shrink-0 items-center gap-1"
               style={{ minWidth: 140, justifyContent: 'flex-end' }}
             >
-              {canEdit && (
-                <span
-                  title="You own this scene, so your changes are saved to it."
-                  className="rounded-full"
-                  style={{
-                    fontSize: 10,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    padding: '3px 8px',
-                    color: 'rgba(25,25,25,0.6)',
-                    border: '1px solid rgba(25,25,25,0.15)',
-                  }}
-                >
-                  Owner
-                </span>
+              {canEdit && currentExportId && (
+                <>
+                  <span
+                    title="You own this scene, so your changes are saved to it."
+                    className="rounded-full"
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      padding: '3px 8px',
+                      color: 'rgba(25,25,25,0.6)',
+                      border: '1px solid rgba(25,25,25,0.15)',
+                    }}
+                  >
+                    Owner
+                  </span>
+                  <SceneEditor
+                    exportId={currentExportId}
+                    config={config}
+                    currentViewId={viewId}
+                    onSaved={onConfigSaved}
+                  />
+                </>
               )}
               <AccountMenu session={session} currentExportId={currentExportId} />
             </div>
