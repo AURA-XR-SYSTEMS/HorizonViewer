@@ -9,3 +9,5 @@ Thumbs.db
 # Large binary assets (managed separately)
 public/assets/projects/
 public/assets/horizon/
+.claude/
+test-results/
