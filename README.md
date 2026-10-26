@@ -93,6 +93,157 @@ navigation stall. The script verifies atom order on every output.
 
 The Unreal recorder now writes faststart directly, so fresh exports arrive correct.
 
+## Mobile
+
+Share links are increasingly opened on phones, so the viewer adapts to them. Branch
+`j/hzn-mobile` (thread J-HZN, 2026-10-26), built on `main` @ `d0cfee8`, which is what
+`horizon.auraengine.com` serves (the live `index-PYAGUJoj.js` / `index-bgKWAb1q.css` are
+byte-identical to a build of that commit). The `feat/moving-pins` branch named in
+`BUILD.md` §S10 exists only on the workstation that made it, not on the org remote, so it
+is not included here.
+
+### Breakpoints
+
+Everything phone-specific keys off one hook, `useCompactLayout()` in
+`src/lib/useMediaQuery.ts`. A desktop browser at full size takes none of the branches and
+renders exactly as before (the pixel guard below proves it).
+
+| Name      | Query                                          | What changes                                                                                  |
+| --------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `compact` | `(max-width: 767px)`, or `coarse` **and** `short` | Phone layout: two-row header, scroll-strip nav + viewpoint sheet, bottom-sheet pin details, full-width sign-in / editor panels, 44px controls, 16px fields. |
+| `short`   | `(max-height: 500px)`                          | Phone held sideways: 44px header, 96x60 nav cards.                                            |
+| `coarse`  | `(pointer: coarse)`                            | The primary pointer is a finger.                                                              |
+| reduced   | `(prefers-reduced-motion: reduce)`             | Transitions cut straight to the next still instead of playing the fly-through; CSS animations and transitions are collapsed. |
+
+Safe-area insets (`env(safe-area-inset-*)`) pad the header and nav; `index.html` declares
+`viewport-fit=cover` and leaves pinch zoom enabled.
+
+### Gestures (phone layout only)
+
+| Gesture                      | Effect                                                             |
+| ---------------------------- | ------------------------------------------------------------------ |
+| Swipe left / right on still  | Next / previous viewpoint in tour order (plays the transition clip) |
+| Pinch                        | Zoom the still 1-4x about the pinch point; drag pans while zoomed   |
+| Double-tap                   | Zoom to 2.5x at the tap; double-tap again to reset                  |
+| Single tap on still          | Hide the header and nav (immersive); tap again to bring them back   |
+| Tap a pin                    | Opens the location's details in a bottom sheet (44px target)        |
+| Drag the sheet handle down   | Closes the sheet; the backdrop and Escape do too                    |
+| Scroll the card strip        | Browses viewpoints; tap a card or the `N / total` pill for the full list |
+| Arrow keys, Tab, Escape      | Step viewpoints, move focus (visible ring), close sheets. Works on desktop too. |
+
+A new viewpoint resets zoom and closes sheets. While zoomed, swipes pan instead of
+navigating and the nav gives way to the image.
+
+### Audit and what was fixed
+
+Phone-viewport audit on `main` with Playwright device presets iPhone 14, iPhone 15
+(WebKit), Pixel 7 (Chromium), each portrait and landscape, plus a 320px-wide viewport.
+Screenshots and a findings JSONL for every page a share link can reach are in
+`C:\dev\aura\artifacts\2026-10-26\hzn-mobile\baseline\` (before) and `...\after\`.
+
+| #   | Failure on `main` (phone)                                                                                            | Status                                                                                             | Test |
+| --- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---- |
+| 1   | Header toolbar is a fixed row: 5-9 controls off-screen at 390px, 9-14 at 320px; sign-in and edit buttons unreachable | Fixed: logo + tools / views / edit / account buttons; review tools in a scrollable second row       | `controls › every visible control…` |
+| 2   | Tap targets 34-40px (toolbar, account, carousel arrows, 24x28 pins)                                                  | Fixed: 44px everywhere on the phone layout, pins get a 44px button around the 24px glyph           | `controls › every visible control…`, `location pins › …` |
+| 3   | Viewpoint carousel sized from window width with fixed 144px cards; 2 of 6 views visible, arrows 40px                 | Fixed: finger-scrollable strip (112x72, 96x60 sideways), `N / total · name` pill, viewpoint sheet, 44px prev/next | `viewpoints › …` (4 tests) |
+| 4   | Location pins could not be tapped at all: the review-tools overlay sat above them and swallowed pointer events (desktop too) | Fixed: overlay is `pointer-events: none` unless a review tool is active                            | `location pins › …`, desktop `pin-panel` snapshot |
+| 5   | Pin detail panel floats 280-360px beside the pin at 12px text; runs off a 390px screen                               | Fixed: bottom sheet, 16px body text, 44px close                                                    | `location pins › …` |
+| 6   | Pins outside the cover-cropped still are unreachable in portrait (no pan or zoom)                                    | Fixed: pinch-zoom and pan on the still (also trackpad ctrl+wheel)                                  | `still image › pinch…`, `double-tap…` |
+| 7   | Hover-only affordances: card warm-up on `onPointerEnter`, review annotation delete/resize on `group-hover`           | Partly fixed: cards warm on focus/tap; annotation delete/resize handles stay hover-only (see deferred) | — |
+| 8   | Review tools used mouse events only: sketch, pin, text, drag and resize did nothing with a finger                    | Fixed: pointer events with `touch-action: none` on the interaction layer                           | manual (see below) |
+| 9   | No swipe between viewpoints                                                                                          | Fixed                                                                                              | `viewpoints › swiping…` |
+| 10  | No way to clear the UI off the still                                                                                 | Fixed: tap toggles immersive mode                                                                  | `still image › a single tap…` |
+| 11  | Sign-in / scene-editor panels fixed 280-300px wide at the button's right edge; 13px fields trigger iOS zoom; 32px rows | Fixed: full-width panels on phones, 16px fields, 44px rows                                        | `sign-in and editing › …` (2 tests) |
+| 12  | Landscape phone: header and nav took 180 of 340px                                                                    | Fixed: 44px header, 60px cards, sheet capped at 70vh                                               | all tests run on the landscape projects |
+| 13  | No `viewport-fit=cover` / safe-area handling                                                                         | Fixed                                                                                              | `share-link flow › the viewport meta…` |
+| 14  | `prefers-reduced-motion` ignored (fly-through clips, dock animations)                                                | Fixed: crossfade instead of clip; CSS animations collapsed                                         | `motion and focus › prefers-reduced-motion…` |
+| 15  | Inputs had `outline: none`, so keyboard focus on fields was invisible                                                | Fixed: global `:focus-visible` ring                                                                | `motion and focus › tabbing…`, `sign-in…` |
+| 16  | Carousel arrows had no accessible name (Lighthouse `button-name`)                                                    | Fixed: `aria-label`                                                                                | Lighthouse |
+| 17  | Text under 16px: card names 11-13px, pin panel 12px, panel labels 10-11px                                            | Partly fixed: body copy in sheets 16px, nav names 12px+, fields 16px. Uppercase labels stay 11-12px | `location pins › …` |
+| 18  | Transition video on iOS                                                                                              | No change needed: already `playsinline` + `muted`, played from a tap; verified in WebKit            | `viewpoints › tapping a card…` |
+| 19  | Pinch zoom disabled                                                                                                  | No change needed: the viewport meta never disabled it; row 6 adds zoom of the still itself         | `share-link flow › the viewport meta…` |
+| 20  | Orientation change                                                                                                   | Fixed by rows 3, 12: layout re-measures on resize and the media queries flip live                   | landscape projects |
+| 21  | Landing page and error / pending states                                                                              | No change needed: already fit 320px with no overflow                                               | `share-link flow › the landing page…` |
+
+After the changes the audit records no horizontal overflow and no off-screen control on any
+of the seven projects and eight states. The one entry it still lists under "small targets"
+is the 24x28 pin glyph itself, which the audit's selector matches by its `cursor-pointer`
+class; it sits inside the 44px button (row 2).
+
+**Deferred, with reasons.**
+
+- Review annotation delete / resize handles (`group-hover`) are still hover-only on phones.
+  The review tools are a reviewer's desk feature, not part of the share-link tour, and the
+  annotations are not persisted; making their handles touch-first is its own piece of work.
+- Uppercase caption labels (Address, Region, Details, the project / view labels) stay at
+  11-12px. They are labels beside 15-16px values and Lighthouse's legibility audit accepts
+  12px and up.
+- The admin debug panel (`VITE_HORIZON_ENABLE_ADMIN_PANEL`) is untouched: it is a build-time
+  developer surface, never in a client build.
+- The YouTube 360 embed's drag-to-look is mouse-only. No published export uses an embed.
+- Pre-existing, not touched: after a successful save the scene editor's "Saved" marker shows
+  for one frame only, because the reseed effect (keyed on the view's name) resets the save
+  state as soon as the renamed config arrives. The desktop test catches the frame; the phone
+  test asserts on the rename itself and the PUT body instead.
+
+### Tests
+
+The desktop suite is unchanged (`npm run test:e2e`, 15 tests, Desktop Chrome). Two more
+configs run against a dev server started **without** the admin panel on port 4175:
+
+```bash
+VITE_HORIZON_API_BASE_URL=http://127.0.0.1:9999 npx vite --host 127.0.0.1 --port 4175 &
+npx playwright test -c playwright.audit.config.ts          # phones: 18 tests x 7 projects = 126, + audit
+npx playwright test -c playwright.desktop-visual.config.ts # desktop pixel guard: 6 snapshots
+AUDIT_OUT=<dir> npx playwright test -c playwright.audit.config.ts audit   # screenshots + findings.jsonl
+```
+
+The phone projects are iPhone 14 / 15 (WebKit; `AUDIT_ENGINE=chromium` to emulate in
+Chromium), Pixel 7 (Chromium), each portrait and landscape, and a 320x568 viewport. The
+tour fixture in `e2e/fixtures/tour.ts` serves the bundled sample stills and clips, so
+transitions really play. Pinch is synthesised with pointer events (Playwright has no
+two-finger touch).
+
+The desktop pixel guard's snapshots in `e2e/__snapshots__/desktop/` were taken on `main`
+before any source change. One was re-taken on purpose: `pin-panel.png`, because on `main`
+the pin was unclickable (row 4) and the baseline showed no panel.
+
+`npm run format:check` fails on 24 files on `main` already (docs, configs, workflows);
+every file touched here passes Prettier.
+
+### Lighthouse (mobile, production build served by `vite preview`)
+
+Landing page `/` and the still viewer on the bundled `?key=sample-tour` (the API-backed
+share link cannot be stubbed under Lighthouse, so a bundled copy of the test tour is
+shipped in `public/assets/projects/sample-tour/`). Lighthouse 12.8.2, Chromium 1234, default
+mobile emulation and throttling, 2026-10-26. Reports: `C:\dev\aura\artifacts\2026-10-26\hzn-mobile\lighthouse\`.
+
+| Page         | Accessibility before → after | Best practices before → after | Performance | SEO |
+| ------------ | ---------------------------- | ----------------------------- | ----------- | --- |
+| Landing      | 100 → 100                    | 96 → 100            | 99 → 98     | 82  |
+| Still viewer | 92 → 100                     | 93 → 100              | 74 → 74     | 83  |
+
+Before: `button-name` failed (carousel arrows), `font-size` (11px card names) and
+`errors-in-console` (a 404 for `/favicon.ico`, there was no icon link). After: all three
+pass. The one item Lighthouse still lists, `label-content-name-mismatch` on the nav cards,
+is unweighted and reflects the "01" prefix in the accessible name. Performance is dominated
+by the 1919x1079 PNG stills, which this work does not touch.
+
+### Not tested
+
+- Real devices. Everything above ran in Playwright's WebKit and Chromium device emulation on
+  Windows. iOS Safari specifics worth a hands-on check: the home-indicator inset, `100vh`
+  behind the toolbar, low-power-mode autoplay refusal (falls back to a crossfade by design).
+- A signed-in session against the live server (never done with a real account, per team rules).
+- The review tools' touch drawing beyond the pointer-event conversion: the sketch / pin /
+  text tools were exercised by hand in device emulation, not by a test.
+
+### Still to do before it ships
+
+Merge `j/hzn-mobile`, `npm run build` with `VITE_HORIZON_API_BASE_URL`, and the CloudFront
+deploy in "Deploying the viewer", all by the release owner. No HorizonServer change is
+needed.
+
 ## Validation
 
 ```bash

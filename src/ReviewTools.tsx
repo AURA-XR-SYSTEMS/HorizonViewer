@@ -254,6 +254,12 @@ const flatGlassStyle = {
 };
 
 interface ReviewToolsProps {
+  /** Phone layout: two-row header with 44px controls, tools behind a toggle. */
+  compact?: boolean;
+  /** Phone held sideways: a shorter header. */
+  short?: boolean;
+  /** Phone immersive mode (tap on the still): the header slides away. */
+  hidden?: boolean;
   expanded: boolean;
   onToggle: () => void;
   viewId: number;
@@ -269,6 +275,9 @@ interface ReviewToolsProps {
 }
 
 const ReviewTools: React.FC<ReviewToolsProps> = ({
+  compact = false,
+  short = false,
+  hidden = false,
   expanded,
   onToggle,
   viewId,
@@ -285,6 +294,9 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
   const [activeColor, setActiveColor] = useState('#ff3b30');
   const [strokeWidth, setStrokeWidth] = useState(4);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  // Phones: the review tools live in a second row behind one toggle.
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const BTN = compact ? 44 : 36;
 
   // Per-view state — plain objects, not Maps
   const [views, setViews] = useState<Record<number, ViewData>>({});
@@ -641,12 +653,12 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
       flush();
       setDragging(null);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
     return () => {
       if (raf !== null) cancelAnimationFrame(raf);
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
     };
   }, [dragging, viewId, getPos, updateView]);
 
@@ -683,12 +695,12 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
       flush();
       setResizing(null);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
     return () => {
       if (raf !== null) cancelAnimationFrame(raf);
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
     };
   }, [resizing, viewId, updateView]);
 
@@ -738,244 +750,484 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
 
   return (
     <>
-      {/* Header bar */}
-      <div className="absolute left-3 right-3 top-3" style={{ zIndex: 10000 }}>
-        <div className="flex flex-col items-center gap-1.5">
-          <div
-            className="flex w-full items-center rounded-2xl transition-all duration-300"
-            style={{
-              ...headerGlass,
-              height: expanded ? 52 : 0,
-              opacity: expanded ? 1 : 0,
-              overflow: 'hidden',
-              padding: expanded ? '0 16px' : '0',
-            }}
-          >
-            {/* Left — logo. The lockup already carries the AURA wordmark, so only
-                HORIZON is set in type beside it. Height is capped rather than the
-                width so the mark keeps its baseline relationship to the text. */}
+      {/* Header bar - phones: logo + four 44px controls, tools in a second row */}
+      {compact ? (
+        <div
+          className="absolute left-0 right-0 top-0"
+          data-testid="mobile-header"
+          style={{
+            zIndex: 10000,
+            padding:
+              'calc(var(--safe-top) + 8px) calc(var(--safe-right) + 8px) 0 calc(var(--safe-left) + 8px)',
+            transform: hidden ? 'translateY(-120%)' : 'none',
+            transition: 'transform 200ms ease-out',
+            pointerEvents: hidden ? 'none' : 'auto',
+          }}
+        >
+          <div className="flex flex-col gap-1.5">
             <div
-              className="flex flex-shrink-0 items-center gap-2"
-              style={{ minWidth: 140 }}
+              className="flex w-full items-center justify-between rounded-2xl"
+              style={{ ...headerGlass, height: short ? 44 : 52, padding: '0 4px 0 12px' }}
             >
               <img
                 src="/assets/aura-logo.png"
-                alt="AURA"
+                alt="AURA Horizon"
                 draggable={false}
                 className="select-none"
-                style={{ height: 22, width: 'auto', display: 'block' }}
+                style={{ height: 20, width: 'auto', display: 'block' }}
               />
-              <span
-                className="select-none text-base font-light tracking-wider"
-                style={{ color: 'rgba(25,25,25,0.4)', letterSpacing: '0.1em' }}
-              >
-                HORIZON
-              </span>
-            </div>
-
-            {/* Center — tools */}
-            <div className="flex flex-1 items-center justify-center gap-0.5">
-              {tools.map((tool) => (
+              <div className="flex items-center" style={{ gap: 2 }}>
                 <button
-                  key={tool.id}
-                  onClick={() =>
-                    setActiveTool(activeTool === tool.id ? 'select' : tool.id)
-                  }
-                  title={tool.label}
-                  className="relative flex items-center justify-center rounded-lg transition-all hover:bg-black/10"
+                  type="button"
+                  onClick={() => setToolsOpen((prev) => !prev)}
+                  aria-label={toolsOpen ? 'Hide review tools' : 'Show review tools'}
+                  aria-expanded={toolsOpen}
+                  data-testid="mobile-tools-toggle"
+                  className="flex items-center justify-center rounded-lg"
                   style={{
-                    width: 36,
-                    height: 36,
-                    color: activeTool === tool.id ? activeColor : 'rgba(25,25,25,0.75)',
-                    background:
-                      activeTool === tool.id ? activeColor + '18' : 'transparent',
-                    border:
-                      activeTool === tool.id
-                        ? `1.5px solid ${activeColor}55`
-                        : '1.5px solid transparent',
+                    width: BTN,
+                    height: BTN,
+                    color: toolsOpen ? activeColor : 'rgba(25,25,25,0.75)',
+                    background: toolsOpen ? activeColor + '18' : 'transparent',
                   }}
                 >
-                  {tool.icon}
+                  <PenIcon />
                 </button>
-              ))}
-              <div
-                className="mx-1.5 h-5 w-px"
-                style={{ background: 'rgba(0,0,0,0.12)' }}
-              />
-              <button
-                onClick={() => setShowColorPicker(!showColorPicker)}
-                className="flex items-center justify-center rounded-lg hover:bg-black/10"
-                style={{ width: 36, height: 36 }}
-                title="Color"
-              >
-                <div
-                  className="rounded-full"
+                <button
+                  type="button"
+                  onClick={onNavToggle}
+                  aria-label={navExpanded ? 'Hide viewpoints' : 'Show viewpoints'}
+                  aria-pressed={navExpanded}
+                  data-testid="mobile-views-toggle"
+                  className="flex items-center justify-center rounded-lg"
                   style={{
-                    width: 18,
-                    height: 18,
-                    background: activeColor,
-                    border: '2px solid rgba(0,0,0,0.15)',
+                    width: BTN,
+                    height: BTN,
+                    color: navExpanded ? 'rgba(25,25,25,0.75)' : 'rgba(25,25,25,0.35)',
                   }}
-                />
-              </button>
-              {activeTool === 'sketch' &&
-                STROKE_WIDTHS.map((w) => (
-                  <button
-                    key={w}
-                    onClick={() => setStrokeWidth(w)}
-                    className="flex items-center justify-center rounded-lg hover:bg-black/10"
-                    style={{
-                      width: 36,
-                      height: 36,
-                      border:
-                        strokeWidth === w
-                          ? `1.5px solid ${activeColor}55`
-                          : '1.5px solid transparent',
-                    }}
-                    title={`${w}px`}
-                  >
-                    <div
-                      className="rounded-full"
-                      style={{
-                        width: w + 4,
-                        height: w + 4,
-                        background: 'rgba(25,25,25,0.75)',
-                      }}
-                    />
-                  </button>
-                ))}
-              <div
-                className="mx-1.5 h-5 w-px"
-                style={{ background: 'rgba(0,0,0,0.12)' }}
-              />
-              <button
-                onClick={handleUndo}
-                title="Undo (Ctrl+Z)"
-                className="flex items-center justify-center rounded-lg hover:bg-black/10"
-                style={{ width: 36, height: 36, color: 'rgba(25,25,25,0.55)' }}
-              >
-                <UndoIcon />
-              </button>
-              <button
-                onClick={handleClearAll}
-                title="Clear All"
-                className="flex items-center justify-center rounded-lg hover:bg-black/10 hover:text-red-500"
-                style={{ width: 36, height: 36, color: 'rgba(25,25,25,0.55)' }}
-              >
-                <TrashIcon />
-              </button>
-              <div
-                className="mx-1.5 h-5 w-px"
-                style={{ background: 'rgba(0,0,0,0.12)' }}
-              />
-              <button
-                onClick={onNavToggle}
-                title={navExpanded ? 'Hide views' : 'Show views'}
-                className="flex items-center justify-center rounded-lg hover:bg-black/10"
-                style={{
-                  width: 36,
-                  height: 36,
-                  color: navExpanded ? 'rgba(25,25,25,0.75)' : 'rgba(25,25,25,0.35)',
-                }}
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
                 >
-                  <rect x="2" y="2" width="8" height="8" rx="1.5" />
-                  <rect x="14" y="2" width="8" height="8" rx="1.5" />
-                  <rect x="2" y="14" width="8" height="8" rx="1.5" />
-                  <rect x="14" y="14" width="8" height="8" rx="1.5" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Right — account */}
-            <div
-              className="flex flex-shrink-0 items-center gap-1"
-              style={{ minWidth: 140, justifyContent: 'flex-end' }}
-            >
-              {canEdit && currentExportId && (
-                <>
-                  <span
-                    title="You own this scene, so your changes are saved to it."
-                    className="rounded-full"
-                    style={{
-                      fontSize: 10,
-                      letterSpacing: '0.06em',
-                      textTransform: 'uppercase',
-                      padding: '3px 8px',
-                      color: 'rgba(25,25,25,0.6)',
-                      border: '1px solid rgba(25,25,25,0.15)',
-                    }}
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    Owner
-                  </span>
+                    <rect x="2" y="2" width="8" height="8" rx="1.5" />
+                    <rect x="14" y="2" width="8" height="8" rx="1.5" />
+                    <rect x="2" y="14" width="8" height="8" rx="1.5" />
+                    <rect x="14" y="14" width="8" height="8" rx="1.5" />
+                  </svg>
+                </button>
+                {canEdit && currentExportId && (
                   <SceneEditor
                     exportId={currentExportId}
                     config={config}
                     currentViewId={viewId}
                     onSaved={onConfigSaved}
                   />
-                </>
-              )}
-              <AccountMenu session={session} currentExportId={currentExportId} />
+                )}
+                <AccountMenu session={session} currentExportId={currentExportId} />
+              </div>
             </div>
-          </div>
 
-          {/* Color picker */}
-          {showColorPicker && expanded && (
-            <div className="flex gap-1.5 rounded-xl px-3 py-2" style={glassStyle}>
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => {
-                    setActiveColor(c);
-                    setShowColorPicker(false);
-                  }}
-                  className="rounded-full transition-transform hover:scale-110"
-                  style={{
-                    width: 24,
-                    height: 24,
-                    background: c,
-                    border:
-                      activeColor === c
-                        ? '2.5px solid white'
-                        : '2px solid rgba(25,25,25,0.35)',
-                    boxShadow: activeColor === c ? '0 0 8px rgba(0,0,0,0.2)' : 'none',
-                  }}
+            {toolsOpen && (
+              <div
+                className="hz-scroll-x flex items-center rounded-2xl"
+                data-testid="mobile-tools-row"
+                style={{ ...headerGlass, height: 52, padding: '0 6px', gap: 2 }}
+              >
+                {tools.map((tool) => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    onClick={() =>
+                      setActiveTool(activeTool === tool.id ? 'select' : tool.id)
+                    }
+                    title={tool.label}
+                    aria-label={tool.label}
+                    aria-pressed={activeTool === tool.id}
+                    className="flex flex-shrink-0 items-center justify-center rounded-lg"
+                    style={{
+                      width: BTN,
+                      height: BTN,
+                      color: activeTool === tool.id ? activeColor : 'rgba(25,25,25,0.75)',
+                      background:
+                        activeTool === tool.id ? activeColor + '18' : 'transparent',
+                      border:
+                        activeTool === tool.id
+                          ? `1.5px solid ${activeColor}55`
+                          : '1.5px solid transparent',
+                    }}
+                  >
+                    {tool.icon}
+                  </button>
+                ))}
+                <div
+                  className="mx-1 h-6 w-px flex-shrink-0"
+                  style={{ background: 'rgba(0,0,0,0.12)' }}
                 />
-              ))}
-            </div>
-          )}
+                <button
+                  type="button"
+                  onClick={() => setShowColorPicker(!showColorPicker)}
+                  className="flex flex-shrink-0 items-center justify-center rounded-lg"
+                  style={{ width: BTN, height: BTN }}
+                  title="Color"
+                  aria-label="Color"
+                  aria-expanded={showColorPicker}
+                >
+                  <div
+                    className="rounded-full"
+                    style={{
+                      width: 20,
+                      height: 20,
+                      background: activeColor,
+                      border: '2px solid rgba(0,0,0,0.15)',
+                    }}
+                  />
+                </button>
+                {activeTool === 'sketch' &&
+                  STROKE_WIDTHS.map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => setStrokeWidth(w)}
+                      className="flex flex-shrink-0 items-center justify-center rounded-lg"
+                      style={{
+                        width: BTN,
+                        height: BTN,
+                        border:
+                          strokeWidth === w
+                            ? `1.5px solid ${activeColor}55`
+                            : '1.5px solid transparent',
+                      }}
+                      title={`${w}px`}
+                      aria-label={`Stroke ${w}px`}
+                    >
+                      <div
+                        className="rounded-full"
+                        style={{
+                          width: w + 4,
+                          height: w + 4,
+                          background: 'rgba(25,25,25,0.75)',
+                        }}
+                      />
+                    </button>
+                  ))}
+                <div
+                  className="mx-1 h-6 w-px flex-shrink-0"
+                  style={{ background: 'rgba(0,0,0,0.12)' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  title="Undo"
+                  aria-label="Undo"
+                  className="flex flex-shrink-0 items-center justify-center rounded-lg"
+                  style={{ width: BTN, height: BTN, color: 'rgba(25,25,25,0.55)' }}
+                >
+                  <UndoIcon />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  title="Clear All"
+                  aria-label="Clear all"
+                  className="flex flex-shrink-0 items-center justify-center rounded-lg"
+                  style={{ width: BTN, height: BTN, color: 'rgba(25,25,25,0.55)' }}
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            )}
 
-          {/* Toggle (hidden) */}
-          <button
-            onClick={onToggle}
-            className="hidden"
-            style={{
-              width: 28,
-              height: 28,
-              ...glassStyle,
-              color: 'rgba(255,255,255,0.8)',
-            }}
-          >
-            {expanded ? <ChevronUp /> : <ChevronDown />}
-          </button>
+            {showColorPicker && toolsOpen && (
+              <div
+                className="hz-scroll-x flex rounded-xl px-2 py-1"
+                style={{ ...glassStyle, gap: 4 }}
+                role="group"
+                aria-label="Colors"
+              >
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-label={`Color ${c}`}
+                    aria-pressed={activeColor === c}
+                    onClick={() => {
+                      setActiveColor(c);
+                      setShowColorPicker(false);
+                    }}
+                    className="flex flex-shrink-0 items-center justify-center"
+                    style={{ width: 44, height: 44 }}
+                  >
+                    <span
+                      className="rounded-full"
+                      style={{
+                        width: 26,
+                        height: 26,
+                        background: c,
+                        border:
+                          activeColor === c
+                            ? '2.5px solid white'
+                            : '2px solid rgba(25,25,25,0.35)',
+                        boxShadow: activeColor === c ? '0 0 8px rgba(0,0,0,0.2)' : 'none',
+                        display: 'block',
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="absolute left-3 right-3 top-3" style={{ zIndex: 10000 }}>
+          <div className="flex flex-col items-center gap-1.5">
+            <div
+              className="flex w-full items-center rounded-2xl transition-all duration-300"
+              style={{
+                ...headerGlass,
+                height: expanded ? 52 : 0,
+                opacity: expanded ? 1 : 0,
+                overflow: 'hidden',
+                padding: expanded ? '0 16px' : '0',
+              }}
+            >
+              {/* Left — logo. The lockup already carries the AURA wordmark, so only
+                HORIZON is set in type beside it. Height is capped rather than the
+                width so the mark keeps its baseline relationship to the text. */}
+              <div
+                className="flex flex-shrink-0 items-center gap-2"
+                style={{ minWidth: 140 }}
+              >
+                <img
+                  src="/assets/aura-logo.png"
+                  alt="AURA"
+                  draggable={false}
+                  className="select-none"
+                  style={{ height: 22, width: 'auto', display: 'block' }}
+                />
+                <span
+                  className="select-none text-base font-light tracking-wider"
+                  style={{ color: 'rgba(25,25,25,0.4)', letterSpacing: '0.1em' }}
+                >
+                  HORIZON
+                </span>
+              </div>
+
+              {/* Center — tools */}
+              <div className="flex flex-1 items-center justify-center gap-0.5">
+                {tools.map((tool) => (
+                  <button
+                    key={tool.id}
+                    onClick={() =>
+                      setActiveTool(activeTool === tool.id ? 'select' : tool.id)
+                    }
+                    title={tool.label}
+                    className="relative flex items-center justify-center rounded-lg transition-all hover:bg-black/10"
+                    style={{
+                      width: 36,
+                      height: 36,
+                      color: activeTool === tool.id ? activeColor : 'rgba(25,25,25,0.75)',
+                      background:
+                        activeTool === tool.id ? activeColor + '18' : 'transparent',
+                      border:
+                        activeTool === tool.id
+                          ? `1.5px solid ${activeColor}55`
+                          : '1.5px solid transparent',
+                    }}
+                  >
+                    {tool.icon}
+                  </button>
+                ))}
+                <div
+                  className="mx-1.5 h-5 w-px"
+                  style={{ background: 'rgba(0,0,0,0.12)' }}
+                />
+                <button
+                  onClick={() => setShowColorPicker(!showColorPicker)}
+                  className="flex items-center justify-center rounded-lg hover:bg-black/10"
+                  style={{ width: 36, height: 36 }}
+                  title="Color"
+                >
+                  <div
+                    className="rounded-full"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      background: activeColor,
+                      border: '2px solid rgba(0,0,0,0.15)',
+                    }}
+                  />
+                </button>
+                {activeTool === 'sketch' &&
+                  STROKE_WIDTHS.map((w) => (
+                    <button
+                      key={w}
+                      onClick={() => setStrokeWidth(w)}
+                      className="flex items-center justify-center rounded-lg hover:bg-black/10"
+                      style={{
+                        width: 36,
+                        height: 36,
+                        border:
+                          strokeWidth === w
+                            ? `1.5px solid ${activeColor}55`
+                            : '1.5px solid transparent',
+                      }}
+                      title={`${w}px`}
+                    >
+                      <div
+                        className="rounded-full"
+                        style={{
+                          width: w + 4,
+                          height: w + 4,
+                          background: 'rgba(25,25,25,0.75)',
+                        }}
+                      />
+                    </button>
+                  ))}
+                <div
+                  className="mx-1.5 h-5 w-px"
+                  style={{ background: 'rgba(0,0,0,0.12)' }}
+                />
+                <button
+                  onClick={handleUndo}
+                  title="Undo (Ctrl+Z)"
+                  className="flex items-center justify-center rounded-lg hover:bg-black/10"
+                  style={{ width: 36, height: 36, color: 'rgba(25,25,25,0.55)' }}
+                >
+                  <UndoIcon />
+                </button>
+                <button
+                  onClick={handleClearAll}
+                  title="Clear All"
+                  className="flex items-center justify-center rounded-lg hover:bg-black/10 hover:text-red-500"
+                  style={{ width: 36, height: 36, color: 'rgba(25,25,25,0.55)' }}
+                >
+                  <TrashIcon />
+                </button>
+                <div
+                  className="mx-1.5 h-5 w-px"
+                  style={{ background: 'rgba(0,0,0,0.12)' }}
+                />
+                <button
+                  onClick={onNavToggle}
+                  title={navExpanded ? 'Hide views' : 'Show views'}
+                  className="flex items-center justify-center rounded-lg hover:bg-black/10"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    color: navExpanded ? 'rgba(25,25,25,0.75)' : 'rgba(25,25,25,0.35)',
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="2" y="2" width="8" height="8" rx="1.5" />
+                    <rect x="14" y="2" width="8" height="8" rx="1.5" />
+                    <rect x="2" y="14" width="8" height="8" rx="1.5" />
+                    <rect x="14" y="14" width="8" height="8" rx="1.5" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Right — account */}
+              <div
+                className="flex flex-shrink-0 items-center gap-1"
+                style={{ minWidth: 140, justifyContent: 'flex-end' }}
+              >
+                {canEdit && currentExportId && (
+                  <>
+                    <span
+                      title="You own this scene, so your changes are saved to it."
+                      className="rounded-full"
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        padding: '3px 8px',
+                        color: 'rgba(25,25,25,0.6)',
+                        border: '1px solid rgba(25,25,25,0.15)',
+                      }}
+                    >
+                      Owner
+                    </span>
+                    <SceneEditor
+                      exportId={currentExportId}
+                      config={config}
+                      currentViewId={viewId}
+                      onSaved={onConfigSaved}
+                    />
+                  </>
+                )}
+                <AccountMenu session={session} currentExportId={currentExportId} />
+              </div>
+            </div>
+
+            {/* Color picker */}
+            {showColorPicker && expanded && (
+              <div className="flex gap-1.5 rounded-xl px-3 py-2" style={glassStyle}>
+                {COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      setActiveColor(c);
+                      setShowColorPicker(false);
+                    }}
+                    className="rounded-full transition-transform hover:scale-110"
+                    style={{
+                      width: 24,
+                      height: 24,
+                      background: c,
+                      border:
+                        activeColor === c
+                          ? '2.5px solid white'
+                          : '2px solid rgba(25,25,25,0.35)',
+                      boxShadow: activeColor === c ? '0 0 8px rgba(0,0,0,0.2)' : 'none',
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Toggle (hidden) */}
+            <button
+              onClick={onToggle}
+              className="hidden"
+              style={{
+                width: 28,
+                height: 28,
+                ...glassStyle,
+                color: 'rgba(255,255,255,0.8)',
+              }}
+            >
+              {expanded ? <ChevronUp /> : <ChevronDown />}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Annotation overlay */}
       <div
         ref={overlayRef}
         className="absolute inset-0 z-[8]"
-        style={{ visibility: isTransitioning ? 'hidden' : 'visible' }}
+        style={{
+          visibility: isTransitioning ? 'hidden' : 'visible',
+          // With no tool active this layer must not swallow taps meant for the
+          // location pins beneath it; its own annotations opt back in.
+          pointerEvents: activeTool === 'select' ? 'none' : 'auto',
+        }}
       >
         {/* SVG for saved strokes + live stroke */}
         <svg
@@ -1014,11 +1266,13 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
         {activeTool !== 'select' && (
           <div
             className="absolute inset-0"
-            style={{ cursor: toolCursor }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+            data-testid="review-interaction-layer"
+            style={{ cursor: toolCursor, touchAction: 'none' }}
+            onPointerDown={handleMouseDown}
+            onPointerMove={handleMouseMove}
+            onPointerUp={handleMouseUp}
+            onPointerCancel={handleMouseUp}
+            onPointerLeave={handleMouseUp}
           />
         )}
 
@@ -1061,7 +1315,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
               pointerEvents: 'auto',
               cursor: activeTool === 'select' ? 'move' : undefined,
             }}
-            onMouseDown={(e) => handleAnnotationMouseDown(e, img.id, 'image')}
+            onPointerDown={(e) => handleAnnotationMouseDown(e, img.id, 'image')}
           >
             <img
               src={img.src}
@@ -1086,7 +1340,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
                 background: 'rgba(25,25,25,0.4)',
                 border: '1px solid rgba(0,0,0,0.2)',
               }}
-              onMouseDown={(e) => {
+              onPointerDown={(e) => {
                 e.stopPropagation();
                 setResizing({ id: img.id, startW: img.width, startX: e.clientX });
               }}
@@ -1106,7 +1360,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
               pointerEvents: 'auto',
               cursor: activeTool === 'select' ? 'move' : undefined,
             }}
-            onMouseDown={(e) => handleAnnotationMouseDown(e, pin.id, 'pin')}
+            onPointerDown={(e) => handleAnnotationMouseDown(e, pin.id, 'pin')}
           >
             {/* Pin label above */}
             {editingPin !== pin.id && pin.comment && (
@@ -1155,7 +1409,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
                   zIndex: 100,
                 }}
                 onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 <textarea
                   placeholder="Note..."
@@ -1246,7 +1500,7 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
                       transform: 'translate(-50%,-50%)',
                       cursor: 'move',
                     }}
-                    onMouseDown={(e) => {
+                    onPointerDown={(e) => {
                       if (activeTool !== 'select') return;
                       e.stopPropagation();
                       const pos = getPos(e);
@@ -1280,13 +1534,13 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
                   transform: 'translate(-50%,-50%)',
                   cursor: activeTool === 'select' ? 'move' : undefined,
                 }}
-                onMouseDown={(e) => handleAnnotationMouseDown(e, note.id, 'note')}
+                onPointerDown={(e) => handleAnnotationMouseDown(e, note.id, 'note')}
               >
                 <div
                   className="overflow-hidden rounded-xl"
                   style={{ ...glassStyle, minWidth: 180 }}
                   onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
                 >
                   {editingNote === note.id && (
                     <div className="flex justify-end gap-1 px-2 pt-1.5">

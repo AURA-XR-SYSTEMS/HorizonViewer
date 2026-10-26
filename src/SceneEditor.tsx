@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import { NotAuthorizedError, NotSignedInError, saveConfig } from './lib/exportAdminApi';
 import type { ProjectConfig } from './types';
+import { useCompactLayout } from './lib/useMediaQuery';
 
 /**
  * Owner-only editing of a published scene.
@@ -95,6 +96,11 @@ const SceneEditor: React.FC<SceneEditorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState({ top: 0, right: 0 });
+  // Phones: full-width panel, 16px inputs, 44px controls (see AccountMenu).
+  const compact = useCompactLayout();
+  const field: React.CSSProperties = compact
+    ? { ...inputStyle, height: 44, fontSize: 16 }
+    : inputStyle;
 
   const currentView = config.views.find((view) => view.id === currentViewId);
 
@@ -185,7 +191,11 @@ const SceneEditor: React.FC<SceneEditorProps> = ({
         aria-label="Edit scene"
         aria-expanded={open}
         className="flex items-center justify-center rounded-lg transition-all hover:bg-black/10"
-        style={{ width: 34, height: 34, color: 'rgba(25,25,25,0.55)' }}
+        style={{
+          width: compact ? 44 : 34,
+          height: compact ? 44 : 34,
+          color: 'rgba(25,25,25,0.55)',
+        }}
       >
         <PencilIcon />
       </button>
@@ -201,6 +211,15 @@ const SceneEditor: React.FC<SceneEditorProps> = ({
               right: anchor.right,
               zIndex: 10001,
               ...panelStyle,
+              ...(compact
+                ? {
+                    left: 'calc(var(--safe-left) + 12px)',
+                    right: 'calc(var(--safe-right) + 12px)',
+                    width: 'auto',
+                    maxHeight: `calc(100vh - ${anchor.top}px - 16px)`,
+                    overflowY: 'auto',
+                  }
+                : {}),
             }}
           >
             <div className="flex flex-col gap-3">
@@ -217,7 +236,7 @@ const SceneEditor: React.FC<SceneEditorProps> = ({
                   value={projectName}
                   onChange={(event) => setProjectName(event.target.value)}
                   placeholder="Untitled project"
-                  style={inputStyle}
+                  style={field}
                 />
               </div>
 
@@ -228,7 +247,7 @@ const SceneEditor: React.FC<SceneEditorProps> = ({
                     data-testid="scene-editor-view-name"
                     value={viewName}
                     onChange={(event) => setViewName(event.target.value)}
-                    style={inputStyle}
+                    style={field}
                   />
                   {viewNameEmpty && (
                     <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
@@ -256,8 +275,8 @@ const SceneEditor: React.FC<SceneEditorProps> = ({
                   className="rounded-lg transition-all"
                   style={{
                     flex: 1,
-                    height: 32,
-                    fontSize: 12,
+                    height: compact ? 44 : 32,
+                    fontSize: compact ? 16 : 12,
                     fontWeight: 600,
                     color: 'white',
                     background:

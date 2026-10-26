@@ -2,7 +2,11 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { ProjectConfig, AuraLocation, ViewNode } from './types';
 import AuraPin from './AuraPin';
 import ReviewTools from './ReviewTools';
+import MobileNav from './MobileNav';
+import LocationSheet from './LocationSheet';
 import type { Session } from './lib/useSession';
+import { useCompactLayout, useIsShort, useReducedMotion } from './lib/useMediaQuery';
+import { useStillGestures } from './lib/useStillGestures';
 
 interface AuraViewerProps {
   config: ProjectConfig;
@@ -123,6 +127,13 @@ const AuraViewer: React.FC<AuraViewerProps> = ({
     { location: AuraLocation; left: string; top: string }[]
   >([]);
   const [altLayerIndex, setAltLayerIndex] = useState<Record<number, number>>({});
+
+  // Phone layout: see README "Mobile". Nothing below changes a desktop window.
+  const compact = useCompactLayout();
+  const short = useIsShort();
+  const reducedMotion = useReducedMotion();
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const [stillZoomed, setStillZoomed] = useState(false);
 
   const videoCache = useRef<Map<string, HTMLVideoElement>>(new Map());
   const stillCache = useRef<Map<string, HTMLImageElement>>(new Map());
@@ -446,7 +457,9 @@ const AuraViewer: React.FC<AuraViewerProps> = ({
         if (container) container.replaceChildren();
       };
 
-      if (!video) {
+      // Reduced motion: the fly-through is the motion, so cut straight to the
+      // destination still instead of playing the clip.
+      if (!video || reducedMotion) {
         crossfade();
         return;
       }
@@ -516,8 +529,58 @@ const AuraViewer: React.FC<AuraViewerProps> = ({
         }
       }
     },
-    [isTransitioning, currentViewId, views, currentView?.imageUrl, preloadStill]
+    [
+      isTransitioning,
+      currentViewId,
+      views,
+      currentView?.imageUrl,
+      preloadStill,
+      reducedMotion,
+    ]
   );
+
+  // Neighbours in tour order, for swipes, arrow keys and the phone nav.
+  const currentIndex = views.findIndex((v) => v.id === currentViewId);
+  const stepView = useCallback(
+    (delta: number) => {
+      const next = views[currentIndex + delta];
+      if (next) handleTransition(next.id);
+    },
+    [views, currentIndex, handleTransition]
+  );
+
+  const gestures = useStillGestures<HTMLDivElement>({
+    enabled: compact && !isTransitioning,
+    onSwipe: (direction) => stepView(direction === 'left' ? 1 : -1),
+    onTap: () => setChromeHidden((prev) => !prev),
+    onZoomChange: (scale) => setStillZoomed(scale > 1),
+  });
+  const { reset: resetZoom } = gestures;
+
+  // A new viewpoint starts unzoomed with the UI showing.
+  useEffect(() => {
+    resetZoom(false);
+    setStillZoomed(false);
+    setOpenPanels([]);
+  }, [currentViewId, resetZoom]);
+
+  useEffect(() => {
+    if (!compact) setChromeHidden(false);
+  }, [compact]);
+
+  // Arrow keys step through the tour; Escape clears the open pin panels.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (target?.isContentEditable) return;
+      if (e.key === 'ArrowRight') stepView(1);
+      else if (e.key === 'ArrowLeft') stepView(-1);
+      else if (e.key === 'Escape') setOpenPanels([]);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [stepView]);
 
   const availableWidth =
     viewport.windowWidth - 2 * SIDE_PADDING - 2 * ARROW_WIDTH - 2 * ARROW_GAP;
@@ -598,72 +661,98 @@ const AuraViewer: React.FC<AuraViewerProps> = ({
       data-current-view={currentView?.name ?? ''}
       className="relative h-full w-full overflow-hidden bg-black"
     >
-      {/* Layer 0: Static View Image (base) */}
+      {/* Layer 0: Static View Image (base). On phones the base, its alternate
+          layers and the pins share a wrapper that pinch-zooms and pans; on
+          desktop the wrapper is inert and the layers sit exactly as before. */}
       <div
-        ref={containerRef}
+        ref={gestures.ref}
+        data-testid="still-stage"
+        data-zoomed={stillZoomed ? 'true' : 'false'}
         className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: `url(${currentView?.imageUrl})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      />
-
-      {/* Layer 0a: Outgoing still, fading out when no transition video was ready */}
-      {fadeOutImage && (
+        style={
+          compact
+            ? { touchAction: 'none', transformOrigin: '50% 50%', willChange: 'transform' }
+            : undefined
+        }
+      >
         <div
-          className="absolute inset-0 z-[2]"
+          ref={containerRef}
+          className="absolute inset-0 z-0"
           style={{
-            backgroundImage: `url(${fadeOutImage})`,
+            backgroundImage: `url(${currentView?.imageUrl})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            animation: 'viewCrossfade 300ms ease-out forwards',
-            pointerEvents: 'none',
           }}
-          onAnimationEnd={() => setFadeOutImage(null)}
         />
-      )}
 
-      {/* Layer 0b: Alternate layer (fades in/out on top of base) */}
-      {currentView?.alternateLayers &&
-        currentView.alternateLayers.length > 0 &&
-        currentView.alternateLayers.map((alt, i) => {
-          const activeAlt = (altLayerIndex[currentViewId] || 0) - 1;
-          return (
-            <div
-              key={`alt-${currentViewId}-${i}`}
-              className="absolute inset-0 z-[1]"
-              style={{
-                backgroundImage: `url(${alt.imageUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                opacity: activeAlt === i ? 1 : 0,
-                transition: 'opacity 600ms ease-in-out',
-              }}
-            />
-          );
-        })}
+        {/* Layer 0a: Outgoing still, fading out when no transition video was ready */}
+        {fadeOutImage && (
+          <div
+            className="absolute inset-0 z-[2]"
+            style={{
+              backgroundImage: `url(${fadeOutImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              animation: 'viewCrossfade 300ms ease-out forwards',
+              pointerEvents: 'none',
+            }}
+            onAnimationEnd={() => setFadeOutImage(null)}
+          />
+        )}
 
-      {/* Layer 1: Location Pins (behind video) */}
-      <div className="absolute inset-0 z-[5]">
-        {pinPositions.map((entry, i) => {
-          if (!entry) return null;
-          return (
-            <AuraPin
-              key={locations[i].id}
-              location={entry.location}
-              left={entry.left}
-              top={entry.top}
-              isVisible={!isTransitioning}
-              isSelected={openPanels.some((p) => p.location.id === entry.location.id)}
-              onClick={handlePinClick}
-            />
-          );
-        })}
+        {/* Layer 0b: Alternate layer (fades in/out on top of base) */}
+        {currentView?.alternateLayers &&
+          currentView.alternateLayers.length > 0 &&
+          currentView.alternateLayers.map((alt, i) => {
+            const activeAlt = (altLayerIndex[currentViewId] || 0) - 1;
+            return (
+              <div
+                key={`alt-${currentViewId}-${i}`}
+                className="absolute inset-0 z-[1]"
+                style={{
+                  backgroundImage: `url(${alt.imageUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  opacity: activeAlt === i ? 1 : 0,
+                  transition: 'opacity 600ms ease-in-out',
+                }}
+              />
+            );
+          })}
+
+        {/* Layer 1: Location Pins (behind video) */}
+        <div className="absolute inset-0 z-[5]">
+          {pinPositions.map((entry, i) => {
+            if (!entry) return null;
+            return (
+              <AuraPin
+                key={locations[i].id}
+                location={entry.location}
+                left={entry.left}
+                top={entry.top}
+                isVisible={!isTransitioning}
+                isSelected={openPanels.some((p) => p.location.id === entry.location.id)}
+                compact={compact}
+                onClick={handlePinClick}
+              />
+            );
+          })}
+        </div>
       </div>
 
-      {/* Panel Layer */}
-      {!isTransitioning &&
+      {/* Panel Layer (desktop). Phones get a bottom sheet instead. */}
+      {compact && (
+        <LocationSheet
+          location={
+            !isTransitioning && openPanels.length > 0
+              ? openPanels[openPanels.length - 1].location
+              : null
+          }
+          onClose={() => setOpenPanels([])}
+        />
+      )}
+      {!compact &&
+        !isTransitioning &&
         openPanels.map((panel) => (
           <div
             key={panel.location.id}
@@ -824,6 +913,9 @@ const AuraViewer: React.FC<AuraViewerProps> = ({
 
       {/* Layer 2: Review Tools canvas overlay (behind video) */}
       <ReviewTools
+        compact={compact}
+        short={short}
+        hidden={compact && chromeHidden}
         expanded={toolbarExpanded}
         onToggle={() => setToolbarExpanded((prev) => !prev)}
         viewId={currentViewId}
@@ -847,202 +939,223 @@ const AuraViewer: React.FC<AuraViewerProps> = ({
         }}
       />
 
-      {/* Navigation - Centered Bottom Carousel */}
-      <div
-        className="absolute bottom-2 left-1/2 -translate-x-1/2"
-        style={{ zIndex: 10000 }}
-      >
-        <div className="flex flex-col items-center gap-1.5">
-          <div
-            className={`flex items-center transition-all duration-300 ease-out ${timelineExpanded ? 'gap-3' : 'gap-2'} `}
-          >
-            {canScrollLeft && timelineExpanded && (
-              <button
-                onClick={() => scrollCarousel('left')}
-                disabled={isTransitioning}
-                className="flex items-center justify-center shadow-lg transition-all duration-300 ease-out hover:scale-105"
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  color: 'white',
-                }}
-              >
-                <ChevronLeft />
-              </button>
-            )}
+      {/* Navigation - phones: scroll strip + viewpoint sheet */}
+      {compact && timelineExpanded && !chromeHidden && !stillZoomed && (
+        <MobileNav
+          views={views}
+          currentViewId={currentViewId}
+          targetViewId={
+            isTransitioning
+              ? (transitions.find((t) => t.key === activeTransitionKey)?.to ?? null)
+              : null
+          }
+          isTransitioning={isTransitioning}
+          short={short}
+          onSelect={handleCardClick}
+          onPrioritize={(id) => prioritize(`${currentViewId}-${id}`)}
+        />
+      )}
 
+      {/* Navigation - Centered Bottom Carousel (desktop) */}
+      {!compact && (
+        <div
+          className="absolute bottom-2 left-1/2 -translate-x-1/2"
+          style={{ zIndex: 10000 }}
+        >
+          <div className="flex flex-col items-center gap-1.5">
             <div
-              style={{
-                overflow: 'hidden',
-                width: timelineExpanded
-                  ? MAX_VISIBLE_CARDS * CARD_WIDTH +
-                    (MAX_VISIBLE_CARDS - 1) * CARD_GAP +
-                    20
-                  : MAX_VISIBLE_CARDS * 6 + (MAX_VISIBLE_CARDS - 1) * 8,
-                transition: 'width 300ms ease-out',
-              }}
+              className={`flex items-center transition-all duration-300 ease-out ${timelineExpanded ? 'gap-3' : 'gap-2'} `}
             >
+              {canScrollLeft && timelineExpanded && (
+                <button
+                  onClick={() => scrollCarousel('left')}
+                  aria-label="Earlier viewpoints"
+                  disabled={isTransitioning}
+                  className="flex items-center justify-center shadow-lg transition-all duration-300 ease-out hover:scale-105"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: 'white',
+                  }}
+                >
+                  <ChevronLeft />
+                </button>
+              )}
+
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: timelineExpanded ? CARD_GAP : 8,
-                  padding: timelineExpanded ? '10px 10px' : '0',
-                  transform: timelineExpanded
-                    ? `translateX(${-validCarouselIndex * (CARD_WIDTH + CARD_GAP)}px)`
-                    : 'none',
-                  transition:
-                    'transform 400ms cubic-bezier(0.4, 0, 0.2, 1), gap 300ms ease-out, padding 300ms ease-out',
+                  overflow: 'hidden',
+                  width: timelineExpanded
+                    ? MAX_VISIBLE_CARDS * CARD_WIDTH +
+                      (MAX_VISIBLE_CARDS - 1) * CARD_GAP +
+                      20
+                    : MAX_VISIBLE_CARDS * 6 + (MAX_VISIBLE_CARDS - 1) * 8,
+                  transition: 'width 300ms ease-out',
                 }}
               >
-                {(timelineExpanded
-                  ? views
-                  : views.slice(
-                      validCarouselIndex,
-                      validCarouselIndex + MAX_VISIBLE_CARDS
-                    )
-                ).map((node, index) => {
-                  const actualIndex = timelineExpanded
-                    ? index
-                    : validCarouselIndex + index;
-                  const isActive = node.id === currentViewId && !isTransitioning;
-                  const isTarget =
-                    isTransitioning &&
-                    transitions.some(
-                      (t) => t.key === activeTransitionKey && t.to === node.id
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: timelineExpanded ? CARD_GAP : 8,
+                    padding: timelineExpanded ? '10px 10px' : '0',
+                    transform: timelineExpanded
+                      ? `translateX(${-validCarouselIndex * (CARD_WIDTH + CARD_GAP)}px)`
+                      : 'none',
+                    transition:
+                      'transform 400ms cubic-bezier(0.4, 0, 0.2, 1), gap 300ms ease-out, padding 300ms ease-out',
+                  }}
+                >
+                  {(timelineExpanded
+                    ? views
+                    : views.slice(
+                        validCarouselIndex,
+                        validCarouselIndex + MAX_VISIBLE_CARDS
+                      )
+                  ).map((node, index) => {
+                    const actualIndex = timelineExpanded
+                      ? index
+                      : validCarouselIndex + index;
+                    const isActive = node.id === currentViewId && !isTransitioning;
+                    const isTarget =
+                      isTransitioning &&
+                      transitions.some(
+                        (t) => t.key === activeTransitionKey && t.to === node.id
+                      );
+                    const isInView =
+                      actualIndex >= validCarouselIndex &&
+                      actualIndex < validCarouselIndex + MAX_VISIBLE_CARDS;
+
+                    // Dock effect runs on the compositor: the layout box stays fixed
+                    // and only `transform` animates, so navigating never triggers layout.
+                    const isBig = isActive || isTarget;
+                    const scale = isBig ? 1.15 : 0.9;
+                    const dotSize = isActive ? 10 : 6;
+                    const borderRadius = timelineExpanded ? 12 : isActive ? 5 : 3;
+
+                    return (
+                      <button
+                        key={node.id}
+                        onClick={() => handleCardClick(node)}
+                        onPointerEnter={() => prioritize(`${currentViewId}-${node.id}`)}
+                        onFocus={() => prioritize(`${currentViewId}-${node.id}`)}
+                        disabled={isTransitioning}
+                        className={`relative flex-shrink-0 overflow-hidden ${
+                          timelineExpanded
+                            ? 'shadow-lg hover:shadow-xl'
+                            : `${isActive ? 'bg-white' : 'bg-white/50 hover:bg-white/80'}`
+                        } ${isTransitioning ? 'cursor-wait' : 'cursor-pointer'} `}
+                        style={{
+                          width: timelineExpanded ? CARD_WIDTH : dotSize,
+                          height: timelineExpanded ? CARD_HEIGHT : dotSize,
+                          transform: timelineExpanded ? `scale(${scale})` : 'none',
+                          borderRadius,
+                          opacity: timelineExpanded ? (isInView ? 1 : 0) : 1,
+                          border: timelineExpanded
+                            ? '1px solid rgba(255,255,255,0.2)'
+                            : 'none',
+                          boxSizing: 'border-box',
+                          willChange: 'transform',
+                          transition:
+                            'transform 600ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease-out, width 300ms ease-out, height 300ms ease-out, border-radius 300ms ease-out',
+                        }}
+                      >
+                        <div
+                          className="absolute inset-0 bg-cover bg-center"
+                          style={{
+                            backgroundImage: `url(${node.thumbUrl || node.imageUrl})`,
+                            opacity: timelineExpanded ? 1 : 0,
+                            transition: 'opacity 300ms ease-out',
+                          }}
+                        />
+                        <div
+                          className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent"
+                          style={{
+                            opacity: timelineExpanded ? 1 : 0,
+                            transition: 'opacity 300ms ease-out',
+                          }}
+                        />
+                        <span
+                          className="absolute left-3 top-2 font-bold leading-none tracking-tight text-white"
+                          style={{
+                            opacity: timelineExpanded ? 1 : 0,
+                            transition: 'opacity 300ms ease-out',
+                            fontSize: isBig ? 24 : 18,
+                            textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                          }}
+                        >
+                          {String(actualIndex + 1).padStart(2, '0')}
+                        </span>
+                        <span
+                          className="absolute bottom-2 left-3 right-3 truncate text-left font-normal leading-tight text-white"
+                          style={{
+                            opacity: timelineExpanded ? 1 : 0,
+                            transition: 'opacity 300ms ease-out',
+                            fontSize: isBig ? 13 : 11,
+                            textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                          }}
+                        >
+                          {node.name}
+                        </span>
+                        {timelineExpanded &&
+                          node.alternateLayers &&
+                          node.alternateLayers.length > 0 &&
+                          isActive && (
+                            <div className="absolute right-2 top-2 flex gap-1">
+                              {[0, ...node.alternateLayers.map((_, i) => i + 1)].map(
+                                (layerIdx) => (
+                                  <div
+                                    key={layerIdx}
+                                    style={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: '50%',
+                                      background:
+                                        (altLayerIndex[node.id] || 0) === layerIdx
+                                          ? 'white'
+                                          : 'rgba(255,255,255,0.4)',
+                                      transition: 'background 300ms ease',
+                                    }}
+                                  />
+                                )
+                              )}
+                            </div>
+                          )}
+                      </button>
                     );
-                  const isInView =
-                    actualIndex >= validCarouselIndex &&
-                    actualIndex < validCarouselIndex + MAX_VISIBLE_CARDS;
-
-                  // Dock effect runs on the compositor: the layout box stays fixed
-                  // and only `transform` animates, so navigating never triggers layout.
-                  const isBig = isActive || isTarget;
-                  const scale = isBig ? 1.15 : 0.9;
-                  const dotSize = isActive ? 10 : 6;
-                  const borderRadius = timelineExpanded ? 12 : isActive ? 5 : 3;
-
-                  return (
-                    <button
-                      key={node.id}
-                      onClick={() => handleCardClick(node)}
-                      onPointerEnter={() => prioritize(`${currentViewId}-${node.id}`)}
-                      onFocus={() => prioritize(`${currentViewId}-${node.id}`)}
-                      disabled={isTransitioning}
-                      className={`relative flex-shrink-0 overflow-hidden ${
-                        timelineExpanded
-                          ? 'shadow-lg hover:shadow-xl'
-                          : `${isActive ? 'bg-white' : 'bg-white/50 hover:bg-white/80'}`
-                      } ${isTransitioning ? 'cursor-wait' : 'cursor-pointer'} `}
-                      style={{
-                        width: timelineExpanded ? CARD_WIDTH : dotSize,
-                        height: timelineExpanded ? CARD_HEIGHT : dotSize,
-                        transform: timelineExpanded ? `scale(${scale})` : 'none',
-                        borderRadius,
-                        opacity: timelineExpanded ? (isInView ? 1 : 0) : 1,
-                        border: timelineExpanded
-                          ? '1px solid rgba(255,255,255,0.2)'
-                          : 'none',
-                        boxSizing: 'border-box',
-                        willChange: 'transform',
-                        transition:
-                          'transform 600ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms ease-out, width 300ms ease-out, height 300ms ease-out, border-radius 300ms ease-out',
-                      }}
-                    >
-                      <div
-                        className="absolute inset-0 bg-cover bg-center"
-                        style={{
-                          backgroundImage: `url(${node.thumbUrl || node.imageUrl})`,
-                          opacity: timelineExpanded ? 1 : 0,
-                          transition: 'opacity 300ms ease-out',
-                        }}
-                      />
-                      <div
-                        className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent"
-                        style={{
-                          opacity: timelineExpanded ? 1 : 0,
-                          transition: 'opacity 300ms ease-out',
-                        }}
-                      />
-                      <span
-                        className="absolute left-3 top-2 font-bold leading-none tracking-tight text-white"
-                        style={{
-                          opacity: timelineExpanded ? 1 : 0,
-                          transition: 'opacity 300ms ease-out',
-                          fontSize: isBig ? 24 : 18,
-                          textShadow: '0 1px 3px rgba(0,0,0,0.4)',
-                        }}
-                      >
-                        {String(actualIndex + 1).padStart(2, '0')}
-                      </span>
-                      <span
-                        className="absolute bottom-2 left-3 right-3 truncate text-left font-normal leading-tight text-white"
-                        style={{
-                          opacity: timelineExpanded ? 1 : 0,
-                          transition: 'opacity 300ms ease-out',
-                          fontSize: isBig ? 13 : 11,
-                          textShadow: '0 1px 3px rgba(0,0,0,0.4)',
-                        }}
-                      >
-                        {node.name}
-                      </span>
-                      {timelineExpanded &&
-                        node.alternateLayers &&
-                        node.alternateLayers.length > 0 &&
-                        isActive && (
-                          <div className="absolute right-2 top-2 flex gap-1">
-                            {[0, ...node.alternateLayers.map((_, i) => i + 1)].map(
-                              (layerIdx) => (
-                                <div
-                                  key={layerIdx}
-                                  style={{
-                                    width: 6,
-                                    height: 6,
-                                    borderRadius: '50%',
-                                    background:
-                                      (altLayerIndex[node.id] || 0) === layerIdx
-                                        ? 'white'
-                                        : 'rgba(255,255,255,0.4)',
-                                    transition: 'background 300ms ease',
-                                  }}
-                                />
-                              )
-                            )}
-                          </div>
-                        )}
-                    </button>
-                  );
-                })}
+                  })}
+                </div>
               </div>
-            </div>
 
-            {canScrollRight && timelineExpanded && (
-              <button
-                onClick={() => scrollCarousel('right')}
-                disabled={isTransitioning}
-                className="flex items-center justify-center shadow-lg transition-all duration-300 ease-out hover:scale-105"
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  color: 'white',
-                }}
-              >
-                <ChevronRight />
-              </button>
-            )}
+              {canScrollRight && timelineExpanded && (
+                <button
+                  onClick={() => scrollCarousel('right')}
+                  aria-label="Later viewpoints"
+                  disabled={isTransitioning}
+                  className="flex items-center justify-center shadow-lg transition-all duration-300 ease-out hover:scale-105"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: 'white',
+                  }}
+                >
+                  <ChevronRight />
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

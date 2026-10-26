@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  // Phone projects live in playwright.audit.config.ts and the desktop pixel
+  // guard in playwright.desktop-visual.config.ts; both need the 4175 server.
+  testIgnore: ['**/mobile/**', '**/desktop-visual.spec.ts'],
   fullyParallel: true,
   retries: 0,
   use: {

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { deleteExport, listMyExports } from './lib/exportAdminApi';
 import type { OwnedExportSummary } from './lib/apiSchemas';
 import type { Session } from './lib/useSession';
+import { useCompactLayout } from './lib/useMediaQuery';
 
 /**
  * The account control in the viewer header.
@@ -89,6 +90,14 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState({ top: 0, right: 0 });
+  // Phones: the panel spans the width below the header, inputs are 16px (so
+  // iOS does not zoom the page on focus) and every row is 44px tall.
+  const compact = useCompactLayout();
+  const control = compact ? 44 : 34;
+  const field: React.CSSProperties = compact
+    ? { ...inputStyle, height: 44, fontSize: 16 }
+    : inputStyle;
+  const rowHeight = compact ? 44 : 32;
 
   // The panel is fixed-positioned, so it has to be told where the button is.
   const measure = useCallback(() => {
@@ -196,8 +205,8 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
         className="flex items-center justify-center rounded-lg transition-all hover:bg-black/10"
         style={{
           position: 'relative',
-          width: 34,
-          height: 34,
+          width: control,
+          height: control,
           color: account ? 'rgba(25,25,25,0.85)' : 'rgba(25,25,25,0.55)',
         }}
       >
@@ -230,6 +239,16 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
               right: anchor.right,
               zIndex: 10001,
               ...panelStyle,
+              ...(compact
+                ? {
+                    left: 'calc(var(--safe-left) + 12px)',
+                    right: 'calc(var(--safe-right) + 12px)',
+                    width: 'auto',
+                    maxHeight: `calc(100vh - ${anchor.top}px - 16px)`,
+                    overflowY: 'auto',
+                    fontSize: 16,
+                  }
+                : {}),
             }}
           >
             {restoring ? (
@@ -416,8 +435,8 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                   onClick={handleSignOut}
                   className="rounded-lg transition-all hover:bg-black/10"
                   style={{
-                    height: 32,
-                    fontSize: 12,
+                    height: rowHeight,
+                    fontSize: compact ? 16 : 12,
                     color: 'rgba(25,25,25,0.7)',
                     border: '1px solid rgba(25,25,25,0.15)',
                   }}
@@ -444,7 +463,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  style={inputStyle}
+                  style={field}
                 />
                 <input
                   type="password"
@@ -453,7 +472,7 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  style={inputStyle}
+                  style={field}
                 />
                 {error && (
                   <div style={{ fontSize: 11, color: '#dc2626' }} role="alert">
@@ -465,8 +484,8 @@ const AccountMenu: React.FC<AccountMenuProps> = ({ session, currentExportId }) =
                   disabled={busy}
                   className="rounded-lg transition-all"
                   style={{
-                    height: 32,
-                    fontSize: 12,
+                    height: rowHeight,
+                    fontSize: compact ? 16 : 12,
                     fontWeight: 600,
                     color: 'white',
                     background: busy ? 'rgba(25,25,25,0.4)' : 'rgba(25,25,25,0.85)',

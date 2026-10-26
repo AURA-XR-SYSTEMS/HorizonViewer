@@ -7,7 +7,9 @@ dist/
 Thumbs.db
 
 # Large binary assets (managed separately)
-public/assets/projects/
+public/assets/projects/*
 public/assets/horizon/
 .claude/
 test-results/
+# The bundled sample tour is a 2 KB JSON over committed media; Lighthouse and offline demos use it.
+!public/assets/projects/sample-tour/
