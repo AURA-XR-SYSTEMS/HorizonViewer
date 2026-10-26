@@ -7,7 +7,8 @@ import { stubBootstrapError, stubTour, TOUR_EXPORT_ID } from './fixtures/tour';
  * The mobile work must leave desktop untouched. These snapshots were taken on
  * main (d0cfee8) before any source change; every page a share link reaches is
  * compared at 1280x720 Desktop Chrome. Update them only for a deliberate
- * desktop change, with `--update-snapshots`.
+ * desktop change, with `--update-snapshots`. They are machine-specific at the
+ * 1% level (see SNAP); a clean 6/6 is a statement about one machine.
  *
  * The pin click is forced because on main the annotation overlay sits above the
  * pins and swallows pointer events (fixed on this branch); forcing keeps the
@@ -16,7 +17,10 @@ import { stubBootstrapError, stubTour, TOUR_EXPORT_ID } from './fixtures/tour';
 
 test.use({ viewport: { width: 1280, height: 720 } });
 
-const SNAP = { maxDiffPixelRatio: 0.002 };
+// Baselines were taken on one Windows machine; another machine's Chromium renders
+// text and blur about 1% differently, so the tolerance is wide enough for that
+// and narrow enough to catch a moved or missing control.
+const SNAP = { maxDiffPixelRatio: 0.02 };
 
 test('landing page', async ({ page }) => {
   await page.goto('/');

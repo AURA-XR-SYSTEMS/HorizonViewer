@@ -205,17 +205,28 @@ transitions really play. Pinch is synthesised with pointer events (Playwright ha
 two-finger touch).
 
 The desktop pixel guard's snapshots in `e2e/__snapshots__/desktop/` were taken on `main`
-before any source change. One was re-taken on purpose: `pin-panel.png`, because on `main`
-the pin was unclickable (row 4) and the baseline showed no panel.
+before any source change, on one Windows machine. Another machine's Chromium renders text
+and blur about 1% differently, so the comparison allows `maxDiffPixelRatio: 0.02`; a 6/6
+is a statement about the machine it ran on. One snapshot was re-taken on purpose:
+`pin-panel.png`, because on `main` the pin was unclickable (row 4) and the baseline showed
+no panel. Known flake, also on `main`: `scene-editor.spec.ts:58` (the owner rename) fails
+about one run in five; it is unrelated to this work.
 
 `npm run format:check` fails on 24 files on `main` already (docs, configs, workflows);
 every file touched here passes Prettier.
 
 ### Lighthouse (mobile, production build served by `vite preview`)
 
-Landing page `/` and the still viewer on the bundled `?key=sample-tour` (the API-backed
-share link cannot be stubbed under Lighthouse, so a bundled copy of the test tour is
-shipped in `public/assets/projects/sample-tour/`). Lighthouse 12.8.2, Chromium 1234, default
+Landing page `/` and the still viewer on `?key=sample-tour`. The API-backed share link
+cannot be stubbed under Lighthouse, so the test tour lives in `e2e/fixtures/sample-tour/`
+(not in `public/`, so it never ships) and is copied into the built output just for the
+measurement:
+
+```bash
+npm run build
+mkdir -p dist/assets/projects/sample-tour && cp e2e/fixtures/sample-tour/config.json dist/assets/projects/sample-tour/
+npx vite preview --port 4181   # then lighthouse http://127.0.0.1:4181/?key=sample-tour
+``` Lighthouse 12.8.2, Chromium 1234, default
 mobile emulation and throttling, 2026-10-26. Reports: `C:\dev\aura\artifacts\2026-10-26\hzn-mobile\lighthouse\`.
 
 | Page         | Accessibility before → after | Best practices before → after | Performance | SEO |
