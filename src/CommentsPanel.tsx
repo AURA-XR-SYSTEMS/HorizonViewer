@@ -4,6 +4,7 @@ import BottomSheet from './BottomSheet';
 import {
   COMMENT_MAX_CHARS,
   COMMENT_NAME_MAX_CHARS,
+  contextFromLocation,
   hideComment,
   listComments,
   postComment,
@@ -161,6 +162,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
         viewId: currentViewId,
         text: trimmed,
         name: name.trim() || undefined,
+        context: contextFromLocation(window.location.search),
         website: website || undefined,
       });
       setComments((prev) => [...(prev ?? []), created]);

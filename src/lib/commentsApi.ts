@@ -26,11 +26,42 @@ export interface TourComment {
   createdAt: string;
 }
 
+/**
+ * What the share link carried, so the comment lands in the right consultation
+ * (J-ENGAGE reads `consultation`/`c`, `branch`, `receipt`/`r` from the link).
+ */
+export interface CommentContext {
+  consultation?: string;
+  branch?: string;
+  receipt?: string;
+}
+
+const CONTEXT_ID = /^[A-Za-z0-9:_.-]{1,128}$/;
+
+/** The link's consultation ids, or undefined when the link carried none. */
+export function contextFromLocation(search: string): CommentContext | undefined {
+  const params = new URLSearchParams(search);
+  const pick = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = params.get(key)?.trim();
+      if (value && CONTEXT_ID.test(value)) return value;
+    }
+    return undefined;
+  };
+  const context: CommentContext = {
+    consultation: pick('consultation', 'c'),
+    branch: pick('branch'),
+    receipt: pick('receipt', 'r'),
+  };
+  return Object.values(context).some(Boolean) ? context : undefined;
+}
+
 export interface NewComment {
   viewId: number;
   text: string;
   name?: string;
   position?: CommentPosition;
+  context?: CommentContext;
   /** Honeypot. A real form leaves it empty. */
   website?: string;
 }

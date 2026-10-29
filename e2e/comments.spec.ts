@@ -126,6 +126,27 @@ test('a resident posts on the viewpoint on screen without signing in', async ({
   expect('website' in store.posted[0]).toBe(false);
 });
 
+test('the consultation ids on the link ride on each comment', async ({
+  page,
+  baseURL,
+}) => {
+  await stubTour(page, baseURL!);
+  const store = await stubComments(page);
+  await page.goto(
+    `/${TOUR_EXPORT_ID}?consultation=dec_7f3a&branch=B1&r=rcpt-9&utm=ignored`
+  );
+  await expect(page.getByTestId('aura-viewer')).toBeVisible();
+  await page.getByTestId('comments-button').click();
+  await page.getByTestId('comment-text').fill('Keyed to the consultation.');
+  await page.getByTestId('comment-send').click();
+  await expect(page.getByTestId('comment-sent')).toBeVisible();
+  expect(store.posted[0].context).toEqual({
+    consultation: 'dec_7f3a',
+    branch: 'B1',
+    receipt: 'rcpt-9',
+  });
+});
+
 test('a refusal from the server is shown, not swallowed', async ({ page, baseURL }) => {
   await stubTour(page, baseURL!);
   await page.route(COMMENTS_URL, async (route) => {
