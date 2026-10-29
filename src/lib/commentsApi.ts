@@ -5,8 +5,10 @@ import { authHeaders } from './auth';
  * Resident comments on a shared tour.
  *
  * Posting needs no account: the link is the credential. The server bounds the
- * text, rate-limits by connection and drops anything that fills the honeypot
- * field. Reading is public, like the tour. Hiding is the owner's.
+ * text, rate-limits by connection, drops anything that fills the honeypot
+ * field, and forwards the comment into the consultation's contribution record
+ * (A5); the receipt it returns is the resident's. No name is asked for or sent.
+ * Reading is public, like the tour. Hiding is the owner's.
  *
  * Contract: HorizonServer `app/comments.py` (J-HZN_resident_comments_CONTRACT).
  */
@@ -20,54 +22,32 @@ export interface TourComment {
   id: string;
   viewId: number;
   text: string;
-  name: string | null;
   position: CommentPosition | null;
-  status: 'new' | 'taken' | 'answered' | 'folded' | 'hidden';
   createdAt: string;
+  /** A5's receipt (C-XXXX-XXXX) once the comment reached the consultation record. */
+  receipt: string | null;
 }
 
-/**
- * What the share link carried, so the comment lands in the right consultation
- * (J-ENGAGE reads `consultation`/`c`, `branch`, `receipt`/`r` from the link).
- */
-export interface CommentContext {
-  consultation?: string;
-  branch?: string;
-  receipt?: string;
-}
-
-const CONTEXT_ID = /^[A-Za-z0-9:_.-]{1,128}$/;
-
-/** The link's consultation ids, or undefined when the link carried none. */
-export function contextFromLocation(search: string): CommentContext | undefined {
+/** The consultation id the share link carried (`?consultation=` or `?c=`). */
+export function consultationFromLocation(search: string): string | undefined {
   const params = new URLSearchParams(search);
-  const pick = (...keys: string[]) => {
-    for (const key of keys) {
-      const value = params.get(key)?.trim();
-      if (value && CONTEXT_ID.test(value)) return value;
-    }
-    return undefined;
-  };
-  const context: CommentContext = {
-    consultation: pick('consultation', 'c'),
-    branch: pick('branch'),
-    receipt: pick('receipt', 'r'),
-  };
-  return Object.values(context).some(Boolean) ? context : undefined;
+  for (const key of ['consultation', 'c']) {
+    const value = params.get(key)?.trim();
+    if (value && /^[A-Za-z0-9:_.-]{1,128}$/.test(value)) return value;
+  }
+  return undefined;
 }
 
 export interface NewComment {
   viewId: number;
   text: string;
-  name?: string;
   position?: CommentPosition;
-  context?: CommentContext;
+  consultation?: string;
   /** Honeypot. A real form leaves it empty. */
   website?: string;
 }
 
 export const COMMENT_MAX_CHARS = 1000;
-export const COMMENT_NAME_MAX_CHARS = 80;
 
 function requireApiBaseUrl(): string {
   const apiBaseUrl = getApiBaseUrl();

@@ -3,8 +3,7 @@ import { createPortal } from 'react-dom';
 import BottomSheet from './BottomSheet';
 import {
   COMMENT_MAX_CHARS,
-  COMMENT_NAME_MAX_CHARS,
-  contextFromLocation,
+  consultationFromLocation,
   hideComment,
   listComments,
   postComment,
@@ -83,12 +82,11 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState<TourComment[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [name, setName] = useState('');
   const [text, setText] = useState('');
   const [website, setWebsite] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState<{ receipt: string | null } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState({ top: 0, right: 0 });
@@ -161,14 +159,12 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
       const created = await postComment(exportId, {
         viewId: currentViewId,
         text: trimmed,
-        name: name.trim() || undefined,
-        context: contextFromLocation(window.location.search),
+        consultation: consultationFromLocation(window.location.search),
         website: website || undefined,
       });
       setComments((prev) => [...(prev ?? []), created]);
       setText('');
-      setSent(true);
-      window.setTimeout(() => setSent(false), 3000);
+      setSent({ receipt: created.receipt });
     } catch (err) {
       setSendError(err instanceof Error ? err.message : 'Could not send your comment.');
     } finally {
@@ -231,7 +227,7 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
                 <span
                   style={{ fontSize: compact ? 14 : 12, fontWeight: 600, color: strong }}
                 >
-                  {comment.name || 'A resident'}
+                  {comment.receipt ? `Receipt ${comment.receipt}` : 'A resident'}
                 </span>
                 <span style={{ fontSize: compact ? 12 : 10, color: muted }}>
                   {relativeTime(comment.createdAt)}
@@ -281,16 +277,6 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
         <div style={{ fontSize: compact ? 13 : 11, color: muted }}>
           Commenting on {viewIndex(currentViewId)} {viewName(currentViewId)}
         </div>
-        <input
-          type="text"
-          placeholder="Your name (optional)"
-          value={name}
-          maxLength={COMMENT_NAME_MAX_CHARS}
-          onChange={(e) => setName(e.target.value)}
-          autoComplete="name"
-          data-testid="comment-name"
-          style={inputStyle}
-        />
         <textarea
           placeholder="What do you think about this view?"
           value={text}
@@ -350,12 +336,13 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
               data-testid="comment-sent"
               style={{ fontSize: compact ? 14 : 11, color: '#16a34a' }}
             >
-              Sent
+              {sent.receipt ? `Sent · receipt ${sent.receipt}` : 'Sent'}
             </span>
           )}
         </div>
         <div style={{ fontSize: compact ? 12 : 10, color: muted, lineHeight: 1.4 }}>
-          Comments are public to everyone with this link and go to the project team.
+          Comments are public to everyone with this link and go on the consultation
+          record. No name is asked for; keep personal details out of the text.
         </div>
       </form>
     </div>

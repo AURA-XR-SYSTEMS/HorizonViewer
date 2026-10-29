@@ -184,26 +184,32 @@ class; it sits inside the 44px button (row 2).
 
 ### Resident comments ("share and listen")
 
-Anyone with the link can leave a comment on the viewpoint on screen, with no account; the
-project team collects them through HorizonServer's engagement feed. The header gains one
-button (a speech bubble with the count) on desktop and phones. On phones the panel is a
-bottom sheet with 16px fields and 44px controls; on desktop it is a popover like the
-account menu. The owner, signed in, can hide a comment. Bundled projects (`?key=`) have no
-server behind them, so they get no button.
+Anyone with the link can leave a comment on the viewpoint on screen, with no account and no
+name asked for. HorizonServer forwards each comment into the consultation's contribution
+record (A5, memcortex `POST /contributions`) and the receipt A5 returns is shown to the
+resident ("Sent · receipt C-XXXX-XXXX"); until A5 is configured the comment is kept on the
+server and the receipt comes later. The header gains one button (a speech bubble with the
+count) on desktop and phones. On phones the panel is a bottom sheet with 16px fields and
+44px controls; on desktop it is a popover like the account menu. The owner, signed in, can
+hide a comment from the link's list. Bundled projects (`?key=`) have no server behind them,
+so they get no button.
 
-Client: `src/lib/commentsApi.ts`, `src/CommentsPanel.tsx`. Server contract: HorizonServer
+The share link may carry `?consultation=<A4 decision id>` (or `?c=`); the viewer reads that
+one param and sends it with each comment so A5 files it under the right consultation.
+Nothing else is read from the URL.
+
+Client: `src/lib/commentsApi.ts`, `src/CommentsPanel.tsx`. Server: HorizonServer
 `app/comments.py` on branch `j/hzn-ownership` (`POST`/`GET /api/viewer/{exportId}/comments`,
-`GET /api/engage/comments` with a service token, owner `POST /exports/{exportId}/comments/{id}/hide`).
-A honeypot field travels with the form; the server rate-limits by connection and answers
-429, which the panel shows as it is. Tests: `e2e/comments.spec.ts` (desktop, 5) and the
-"resident comments" group of the phone suite.
+owner `POST /exports/{exportId}/comments/{id}/hide`). A honeypot field travels with the form;
+the server rate-limits by connection and answers 429, which the panel shows as it is.
+Tests: `e2e/comments.spec.ts` (desktop, 6) and the "resident comments" group of the phone suite.
 
 This is the one deliberate desktop change besides the pin fix: the desktop pixel-guard
 baselines were re-taken for it on 2026-10-28.
 
 ### Tests
 
-The desktop suite (`npm run test:e2e`, Desktop Chrome) is the original 15 plus the 5 comment tests. Two more
+The desktop suite (`npm run test:e2e`, Desktop Chrome) is the original 15 plus the 6 comment tests. Two more
 configs run against a dev server started **without** the admin panel on port 4175:
 
 ```bash

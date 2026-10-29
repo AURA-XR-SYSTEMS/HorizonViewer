@@ -17,10 +17,9 @@ function comment(overrides: Record<string, unknown> = {}) {
     id: 'c1',
     viewId: 1,
     text: 'Keep the benches by the fountain.',
-    name: 'Ada',
     position: null,
-    status: 'new',
     createdAt: new Date(Date.now() - 5 * 60000).toISOString(),
+    receipt: 'C-7K3M-9QX2',
     ...overrides,
   };
 }
@@ -37,10 +36,9 @@ async function stubComments(page: Page, initial: Record<string, unknown>[] = [])
         id: `c${items.length + 1}`,
         viewId: body.viewId,
         text: body.text,
-        name: body.name ?? null,
         position: body.position ?? null,
-        status: 'new',
         createdAt: new Date().toISOString(),
+        receipt: body.consultation ? `C-TEST-000${items.length + 1}` : null,
       };
       items.push(created);
       await route.fulfill({
@@ -66,7 +64,7 @@ test('the button shows the count and the panel lists the comments', async ({
   await stubTour(page, baseURL!);
   await stubComments(page, [
     comment(),
-    comment({ id: 'c2', viewId: 2, name: null, text: 'Too much glass.' }),
+    comment({ id: 'c2', viewId: 2, receipt: null, text: 'Too much glass.' }),
   ]);
   await page.goto(`/${TOUR_EXPORT_ID}`);
 
@@ -79,7 +77,7 @@ test('the button shows the count and the panel lists the comments', async ({
   await expect(panel).toBeVisible();
   const items = panel.getByTestId('comment-item');
   await expect(items).toHaveCount(2);
-  await expect(items.nth(0)).toContainText('Ada');
+  await expect(items.nth(0)).toContainText('Receipt C-7K3M-9QX2');
   await expect(items.nth(0)).toContainText('on 01 Station Plaza');
   await expect(items.nth(1)).toContainText('A resident');
   await expect(items.nth(1)).toContainText('on 02 Platform Level');
@@ -112,38 +110,35 @@ test('a resident posts on the viewpoint on screen without signing in', async ({
   await expect(page.getByTestId('comment-form')).toContainText(
     'Commenting on 02 Platform Level'
   );
-  await page.getByTestId('comment-name').fill('Bea');
+  // No name field: nothing personal is asked for.
+  await expect(page.getByTestId('comment-name')).toHaveCount(0);
   await page.getByTestId('comment-text').fill('The platform needs shade.');
   await page.getByTestId('comment-send').click();
 
-  await expect(page.getByTestId('comment-sent')).toBeVisible();
-  expect(store.posted).toEqual([
-    { viewId: 2, text: 'The platform needs shade.', name: 'Bea' },
-  ]);
+  await expect(page.getByTestId('comment-sent')).toHaveText('Sent');
+  expect(store.posted).toEqual([{ viewId: 2, text: 'The platform needs shade.' }]);
   await expect(page.getByTestId('comment-item')).toHaveCount(1);
   await expect(page.getByTestId('comments-count')).toHaveText('1');
   // The honeypot was left empty and not sent.
   expect('website' in store.posted[0]).toBe(false);
 });
 
-test('the consultation ids on the link ride on each comment', async ({
+test('the consultation id on the link rides on the comment and the receipt comes back', async ({
   page,
   baseURL,
 }) => {
   await stubTour(page, baseURL!);
   const store = await stubComments(page);
-  await page.goto(
-    `/${TOUR_EXPORT_ID}?consultation=dec_7f3a&branch=B1&r=rcpt-9&utm=ignored`
-  );
+  await page.goto(`/${TOUR_EXPORT_ID}?consultation=dec_7f3a&utm=ignored`);
   await expect(page.getByTestId('aura-viewer')).toBeVisible();
   await page.getByTestId('comments-button').click();
   await page.getByTestId('comment-text').fill('Keyed to the consultation.');
   await page.getByTestId('comment-send').click();
-  await expect(page.getByTestId('comment-sent')).toBeVisible();
-  expect(store.posted[0].context).toEqual({
+  await expect(page.getByTestId('comment-sent')).toHaveText('Sent · receipt C-TEST-0001');
+  expect(store.posted[0]).toEqual({
+    viewId: 1,
+    text: 'Keyed to the consultation.',
     consultation: 'dec_7f3a',
-    branch: 'B1',
-    receipt: 'rcpt-9',
   });
 });
 

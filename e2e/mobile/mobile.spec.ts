@@ -474,10 +474,9 @@ test.describe('resident comments', () => {
           id: 'c1',
           viewId: posted!.viewId,
           text: posted!.text,
-          name: posted!.name ?? null,
           position: null,
-          status: 'new',
           createdAt: new Date().toISOString(),
+          receipt: null,
         };
         items.push(created);
         await route.fulfill({
