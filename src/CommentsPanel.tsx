@@ -165,6 +165,11 @@ const CommentsPanel: React.FC<CommentsPanelProps> = ({
       setComments((prev) => [...(prev ?? []), created]);
       setText('');
       setSent({ receipt: created.receipt });
+      // The server files the comment with the consultation after answering;
+      // the receipt shows up on the list a moment later.
+      if (!created.receipt) {
+        window.setTimeout(() => void load(), 1500);
+      }
     } catch (err) {
       setSendError(err instanceof Error ? err.message : 'Could not send your comment.');
     } finally {
