@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import AccountMenu from './AccountMenu';
 import SceneEditor from './SceneEditor';
+import CommentsPanel from './CommentsPanel';
 import type { ProjectConfig } from './types';
 import type { Session } from './lib/useSession';
 
@@ -769,12 +770,14 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
               className="flex w-full items-center justify-between rounded-2xl"
               style={{ ...headerGlass, height: short ? 44 : 52, padding: '0 4px 0 12px' }}
             >
+              {/* Under 360px the five 44px controls need the whole row; the
+                  mark comes back as soon as there is room for it. */}
               <img
                 src="/assets/aura-logo.png"
                 alt="AURA Horizon"
                 draggable={false}
-                className="select-none"
-                style={{ height: 20, width: 'auto', display: 'block' }}
+                className="hidden select-none min-[360px]:block"
+                style={{ height: 20, width: 'auto' }}
               />
               <div className="flex items-center" style={{ gap: 2 }}>
                 <button
@@ -822,6 +825,16 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
                     <rect x="14" y="14" width="8" height="8" rx="1.5" />
                   </svg>
                 </button>
+                {currentExportId && (
+                  <CommentsPanel
+                    exportId={currentExportId}
+                    views={config.views}
+                    currentViewId={viewId}
+                    compact
+                    canEdit={canEdit}
+                    buttonSize={BTN}
+                  />
+                )}
                 {canEdit && currentExportId && (
                   <SceneEditor
                     exportId={currentExportId}
@@ -1147,6 +1160,16 @@ const ReviewTools: React.FC<ReviewToolsProps> = ({
                 className="flex flex-shrink-0 items-center gap-1"
                 style={{ minWidth: 140, justifyContent: 'flex-end' }}
               >
+                {currentExportId && (
+                  <CommentsPanel
+                    exportId={currentExportId}
+                    views={config.views}
+                    currentViewId={viewId}
+                    compact={false}
+                    canEdit={canEdit}
+                    buttonSize={34}
+                  />
+                )}
                 {canEdit && currentExportId && (
                   <>
                     <span

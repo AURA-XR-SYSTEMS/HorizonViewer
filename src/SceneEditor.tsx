@@ -105,12 +105,19 @@ const SceneEditor: React.FC<SceneEditorProps> = ({
   const currentView = config.views.find((view) => view.id === currentViewId);
 
   // Reseed whenever the panel opens or the scene changes underneath it, so the
-  // fields never show edits from a previous view or a stale save.
+  // fields never show edits from a previous view or a stale save. A change
+  // that is our own save arriving back keeps the "Saved" state: resetting it
+  // here showed the marker for a single frame (the flaky desktop test).
+  const ownSave = useRef(false);
   useEffect(() => {
     if (!open) return;
     setProjectName(config.projectName ?? '');
     setViewName(currentView?.name ?? '');
-    setSave({ kind: 'idle' });
+    if (ownSave.current) {
+      ownSave.current = false;
+    } else {
+      setSave({ kind: 'idle' });
+    }
   }, [open, config.projectName, currentView?.name]);
 
   const measure = useCallback(() => {
@@ -169,6 +176,7 @@ const SceneEditor: React.FC<SceneEditorProps> = ({
     setSave({ kind: 'saving' });
     try {
       await saveConfig(exportId, next);
+      ownSave.current = true;
       onSaved(next);
       setSave({ kind: 'saved' });
     } catch (err) {

@@ -458,3 +458,64 @@ test.describe('motion and focus', () => {
     expect(parseFloat(focused.width)).toBeGreaterThanOrEqual(2);
   });
 });
+
+test.describe('resident comments', () => {
+  test('a resident comments from the phone in a bottom sheet', async ({
+    page,
+    baseURL,
+  }) => {
+    const commentsUrl = `http://127.0.0.1:9999/api/viewer/${TOUR_EXPORT_ID}/comments`;
+    const items: Record<string, unknown>[] = [];
+    let posted: Record<string, unknown> | null = null;
+    await page.route(commentsUrl, async (route) => {
+      if (route.request().method() === 'POST') {
+        posted = JSON.parse(route.request().postData() ?? '{}');
+        const created = {
+          id: 'c1',
+          viewId: posted!.viewId,
+          text: posted!.text,
+          name: posted!.name ?? null,
+          position: null,
+          status: 'new',
+          createdAt: new Date().toISOString(),
+        };
+        items.push(created);
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify(created),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ exportId: TOUR_EXPORT_ID, count: items.length, items }),
+      });
+    });
+    await openTour(page, baseURL!);
+
+    const button = page.getByTestId('comments-button');
+    expect((await button.boundingBox())!.width).toBeGreaterThanOrEqual(44);
+    await button.click();
+    const sheet = page.getByTestId('comments-sheet');
+    await expect(sheet).toBeVisible();
+    await expect(page.getByTestId('comments-empty')).toBeVisible();
+
+    const text = page.getByTestId('comment-text');
+    expect(parseFloat(await text.evaluate((n) => getComputedStyle(n).fontSize))).toBe(16);
+    await text.fill('Needs a crossing here.');
+    const send = page.getByTestId('comment-send');
+    expect((await send.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await send.click();
+
+    await expect(page.getByTestId('comment-sent')).toBeVisible();
+    expect(posted).toEqual({ viewId: 1, text: 'Needs a crossing here.' });
+    await expect(sheet.getByTestId('comment-item')).toHaveCount(1);
+    expect(await smallTargets(page)).toEqual([]);
+
+    await page.getByTestId('comments-sheet-close').click();
+    await expect(sheet).toBeHidden();
+    await expect(page.getByTestId('comments-count')).toHaveText('1');
+  });
+});

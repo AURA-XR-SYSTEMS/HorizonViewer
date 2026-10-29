@@ -181,19 +181,34 @@ class; it sits inside the 44px button (row 2).
 - The admin debug panel (`VITE_HORIZON_ENABLE_ADMIN_PANEL`) is untouched: it is a build-time
   developer surface, never in a client build.
 - The YouTube 360 embed's drag-to-look is mouse-only. No published export uses an embed.
-- Pre-existing, not touched: after a successful save the scene editor's "Saved" marker shows
-  for one frame only, because the reseed effect (keyed on the view's name) resets the save
-  state as soon as the renamed config arrives. The desktop test catches the frame; the phone
-  test asserts on the rename itself and the PUT body instead.
+
+### Resident comments ("share and listen")
+
+Anyone with the link can leave a comment on the viewpoint on screen, with no account; the
+project team collects them through HorizonServer's engagement feed. The header gains one
+button (a speech bubble with the count) on desktop and phones. On phones the panel is a
+bottom sheet with 16px fields and 44px controls; on desktop it is a popover like the
+account menu. The owner, signed in, can hide a comment. Bundled projects (`?key=`) have no
+server behind them, so they get no button.
+
+Client: `src/lib/commentsApi.ts`, `src/CommentsPanel.tsx`. Server contract: HorizonServer
+`app/comments.py` on branch `j/hzn-ownership` (`POST`/`GET /api/viewer/{exportId}/comments`,
+`GET /api/engage/comments` with a service token, owner `POST /exports/{exportId}/comments/{id}/hide`).
+A honeypot field travels with the form; the server rate-limits by connection and answers
+429, which the panel shows as it is. Tests: `e2e/comments.spec.ts` (desktop, 5) and the
+"resident comments" group of the phone suite.
+
+This is the one deliberate desktop change besides the pin fix: the desktop pixel-guard
+baselines were re-taken for it on 2026-10-28.
 
 ### Tests
 
-The desktop suite is unchanged (`npm run test:e2e`, 15 tests, Desktop Chrome). Two more
+The desktop suite (`npm run test:e2e`, Desktop Chrome) is the original 15 plus the 5 comment tests. Two more
 configs run against a dev server started **without** the admin panel on port 4175:
 
 ```bash
 VITE_HORIZON_API_BASE_URL=http://127.0.0.1:9999 npx vite --host 127.0.0.1 --port 4175 &
-npx playwright test -c playwright.audit.config.ts          # phones: 18 tests x 7 projects = 126, + audit
+npx playwright test -c playwright.audit.config.ts          # phones: 19 tests x 7 projects = 133, + audit
 npx playwright test -c playwright.desktop-visual.config.ts # desktop pixel guard: 6 snapshots
 AUDIT_OUT=<dir> npx playwright test -c playwright.audit.config.ts audit   # screenshots + findings.jsonl
 ```
@@ -209,8 +224,9 @@ before any source change, on one Windows machine. Another machine's Chromium ren
 and blur about 1% differently, so the comparison allows `maxDiffPixelRatio: 0.02`; a 6/6
 is a statement about the machine it ran on. One snapshot was re-taken on purpose:
 `pin-panel.png`, because on `main` the pin was unclickable (row 4) and the baseline showed
-no panel. Known flake, also on `main`: `scene-editor.spec.ts:58` (the owner rename) fails
-about one run in five; it is unrelated to this work.
+no panel. The flake in `scene-editor.spec.ts:58` (the owner rename, about one run in five on
+`main`) was the "Saved" marker showing for a single frame: the scene editor's reseed effect
+reset the save state when its own save came back. Fixed in `SceneEditor.tsx` on 2026-10-28.
 
 `npm run format:check` fails on 24 files on `main` already (docs, configs, workflows);
 every file touched here passes Prettier.
